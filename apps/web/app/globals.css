@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+:root {
+  --background: theme(colors.zinc.50);
+  --foreground: theme(colors.zinc.950);
+  --grid-size: 36px;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-source-code-pro);
+  --font-display: var(--font-juxta-sans-mono);
+  --spacing-grid: var(--grid-size);
+}
+
+@layer utilities {
+  .font-extrablack {
+    font-weight: 950;
+    font-style: normal;
+  }
+}
+
+html.dark {
+  --background: theme(colors.zinc.900);
+  --foreground: theme(colors.zinc.100);
+}
+
+html {
+  @apply bg-background text-foreground;
+}
