@@ -1,5 +1,2 @@
-import external from "@anglish/core";
-import local from "./other";
-
-console.log(local);
-console.log(external);
+export * from "./client";
+export * from "./tables";

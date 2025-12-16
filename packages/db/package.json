@@ -1,29 +1,34 @@
 {
-    "name": "@anglish/db",
-    "version": "0.1.0",
-    "publishConfig": {
-      "registry": "https://npm.pkg.github.com/"
-    },
-    "type": "module",
-
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-
-    "exports": {
-      ".": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
-    },
-
-    "files": ["dist"],
-
-    "scripts": {},
-
-    "dependencies": {
-      "@anglish/core": "workspace:*"
-    },
-    "devDependencies": {
-      "@anglish/config": "workspace:*"
+  "name": "@anglish/db",
+  "version": "0.1.0",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "db:reset": "tsx --tsconfig tsconfig.scripts.json scripts/reset.ts",
+    "db:bootstrap": "tsx --tsconfig tsconfig.scripts.json scripts/bootstrap.ts"
+  },
+  "dependencies": {
+    "@anglish/core": "workspace:*",
+    "kysely": "0.28.9",
+    "pg": "8.16.3"
+  },
+  "devDependencies": {
+    "@anglish/config": "workspace:*",
+    "@types/pg": "8.16.0",
+    "colors": "1.4.0",
+    "dependency-graph": "1.0.0"
   }
+}
