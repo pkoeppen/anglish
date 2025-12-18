@@ -1,29 +1,36 @@
 {
-    "name": "@anglish/pipeline",
-    "version": "0.1.0",
-    "publishConfig": {
-      "registry": "https://npm.pkg.github.com/"
-    },
-    "type": "module",
-
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-
-    "exports": {
-      ".": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
-    },
-
-    "files": ["dist"],
-
-    "scripts": {},
-
-    "dependencies": {
-      "@anglish/core": "workspace:*"
-    },
-    "devDependencies": {
-      "@anglish/config": "workspace:*"
+  "name": "@anglish/pipeline",
+  "version": "0.1.0",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "etl": "pnpm run fetch && pnpm run parse && pnpm run normalize && pnpm run merge && pnpm run map",
+    "fetch": "tsx src/cli.ts fetch",
+    "fetch:force": "tsx src/cli.ts fetch --force",
+    "parse": "tsx src/cli.ts parse",
+    "normalize": "tsx src/cli.ts normalize",
+    "merge": "tsx src/cli.ts merge",
+    "map": "tsx src/cli.ts map"
+  },
+  "dependencies": {
+    "@anglish/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@anglish/config": "workspace:*",
+    "cheerio": "^1.1.2",
+    "colors": "1.4.0"
   }
+}

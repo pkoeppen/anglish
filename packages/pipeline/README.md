@@ -1,0 +1,3 @@
+- fetch needs to create ID by artifact, not query params
+- parse stage should overwrite parse output every time - not append
+-

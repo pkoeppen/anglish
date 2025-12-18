@@ -1,23 +1,33 @@
 {
-    "name": "anglish",
-    "private": true,
-    "workspaces": [
-        "apps/*",
-        "packages/*"
-    ],
-    "devDependencies": {
-        "@eslint/js": "^9.39.2",
-        "@trivago/prettier-plugin-sort-imports": "6.0.0",
-        "@types/node": "20.19.27",
-        "eslint": "9.39.2",
-        "eslint-config-prettier": "10.1.8",
-        "prettier": "3.7.4",
-        "typescript": "5.9.3",
-        "typescript-eslint": "^8.50.0"
-    },
-    "pnpm": {
-        "overrides": {
-            "typescript": "5.9.3"
-        }
+  "name": "anglish",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "etl": "pnpm --filter @anglish/pipeline run etl",
+    "etl:fetch": "pnpm --filter @anglish/pipeline run fetch",
+    "etl:parse": "pnpm --filter @anglish/pipeline run parse",
+    "etl:normalize": "pnpm --filter @anglish/pipeline run normalize",
+    "etl:merge": "pnpm --filter @anglish/pipeline run merge",
+    "etl:map": "pnpm --filter @anglish/pipeline run map",
+    "etl:clean": "rm -rf data/anglish"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@trivago/prettier-plugin-sort-imports": "6.0.0",
+    "@types/node": "20.19.27",
+    "eslint": "9.39.2",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.7.4",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.50.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "typescript": "5.9.3"
     }
+  }
 }

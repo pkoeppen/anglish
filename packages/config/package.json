@@ -4,8 +4,6 @@
   "type": "module",
 
   "exports": {
-    "./tsconfig/node": "./tsconfig/node.json",
-    "./tsconfig/next": "./tsconfig/next.json",
     "./eslint/node": "./eslint/node.mjs",
     "./eslint/next": "./eslint/next.mjs",
     "./prettier/base": "./prettier/base.mjs"

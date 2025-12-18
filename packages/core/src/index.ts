@@ -1,5 +1,1 @@
-const core = {
-  test: "test",
-};
-
-export default core;
+export { default as logger } from "./logger";
