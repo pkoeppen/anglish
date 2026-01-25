@@ -1,12 +1,14 @@
-import fs from "node:fs";
-import fsp from "node:fs/promises";
-import path from "node:path";
-import readline from "node:readline";
-import { type AnglishMootSourceRecord } from "../sources/anglish_moot/parse";
-import { type HurlebatteSourceRecord } from "../sources/hurlebatte_wordbook/parse";
-import { type KaikkiSourceRecord } from "../sources/kaikki/parse";
+import type { WordOrigin } from "@anglish/core";
+import type { AnglishMootSourceRecord } from "../sources/anglish_moot/02_parse";
+import type { HurlebatteSourceRecord } from "../sources/hurlebatte_wordbook/02_parse";
+import type { KaikkiSourceRecord } from "../sources/kaikki/02_parse";
+import * as fs from "node:fs";
+import * as fsp from "node:fs/promises";
+import * as path from "node:path";
+import * as readline from "node:readline";
+import { makeLimiter } from "../util";
 
-export type NormalizeManifestRow = {
+export interface NormalizeManifestRow {
   id: string;
   source: string;
   inputPath: string;
@@ -14,33 +16,35 @@ export type NormalizeManifestRow = {
   recordsIn: number;
   recordsOut: number;
   normalizedAt: string;
-};
+}
 
-export type NormalizeStageConfig = {
+export interface NormalizeStageConfig {
   dataRoot: string;
   force?: boolean;
-};
+  verbose?: boolean;
+  concurrency?: number;
+}
 
 type AnySourceRecord = HurlebatteSourceRecord | AnglishMootSourceRecord | KaikkiSourceRecord;
 
-export type NormalizedRecord = {
+export interface NormalizedRecord {
   v: 1;
   source: string;
   rawId: string;
   lemma: string;
   pos: string;
   glosses: string[];
-  origin?: string;
+  origins: WordOrigin[];
   meta: {
     normalizedAt: string;
     [key: string]: unknown;
   };
-};
+}
 
 export type SourceNormalizer<T extends AnySourceRecord = AnySourceRecord> = (
   record: T,
   normalizedAt: string,
-) => NormalizedRecord | null;
+) => NormalizedRecord[] | Promise<NormalizedRecord[]>;
 
 export async function runNormalizeStage(
   normalizers: Record<string, SourceNormalizer<any>>,
@@ -55,13 +59,13 @@ export async function runNormalizeStage(
 
   if (!config.force) {
     // If manifest exists we assume outputs already exist and skip.
-    if (fs.existsSync(outManifest)) return [];
+    if (fs.existsSync(outManifest))
+      return [];
   }
 
   await fsp.writeFile(outManifest, "", "utf8");
 
-  const files = (await fsp.readdir(inDir)).filter((f) => f.endsWith(".source_records.jsonl"));
-
+  const files = (await fsp.readdir(inDir)).filter(f => f.endsWith(".source_records.jsonl"));
   const results: NormalizeManifestRow[] = [];
   const normalizedAt = new Date().toISOString();
 
@@ -72,7 +76,7 @@ export async function runNormalizeStage(
 
     const normalize = normalizers[source];
     if (!normalize) {
-      console.warn(`No normalizer for source: ${source}`.yellow);
+      console.warn(`No normalizer for source: ${source}`.red);
       continue;
     }
 
@@ -82,16 +86,42 @@ export async function runNormalizeStage(
     let recordsIn = 0;
     let recordsOut = 0;
 
+    // Collect all records first
+    const records: AnySourceRecord[] = [];
+    for await (const record of readJsonl<AnySourceRecord>(inputPath)) {
+      records.push(record);
+      recordsIn++;
+    }
+
+    console.log(`Normalizing ${records.length} records (${source})`);
+
+    // Process records concurrently
+    const concurrency = config.concurrency ?? 20;
+    const run = makeLimiter(concurrency);
+
+    const normalizedResults = await Promise.all(
+      records.map((record, index) =>
+        run(async () => {
+          const normalized = await normalize(record, normalizedAt);
+          return { index, normalized };
+        }),
+      ),
+    );
+
     const w = fs.createWriteStream(outputPath, { flags: "a" });
     try {
-      for await (const record of readJsonl<AnySourceRecord>(inputPath)) {
-        recordsIn++;
-        const normalized = normalize(record, normalizedAt);
-        if (!normalized) continue;
-        recordsOut++;
-        w.write(JSON.stringify(normalized) + "\n");
+      // sort by original index to maintain order
+      normalizedResults.sort((a, b) => a.index - b.index);
+      for (const { normalized } of normalizedResults) {
+        if (!normalized.length)
+          continue;
+        recordsOut += normalized.length;
+        for (const record of normalized) {
+          w.write(`${JSON.stringify(record)}\n`);
+        }
       }
-    } finally {
+    }
+    finally {
       await new Promise<void>((resolve, reject) => {
         w.end(() => resolve());
         w.on("error", reject);
@@ -109,7 +139,7 @@ export async function runNormalizeStage(
     };
 
     results.push(manifestRow);
-    await fsp.appendFile(outManifest, JSON.stringify(manifestRow) + "\n", "utf8");
+    await fsp.appendFile(outManifest, `${JSON.stringify(manifestRow)}\n`, "utf8");
   }
 
   return results;
@@ -121,7 +151,8 @@ async function* readJsonl<T>(filePath: string): AsyncGenerator<T> {
 
   for await (const line of rl) {
     const s = line.trim();
-    if (!s) continue;
+    if (!s)
+      continue;
     yield JSON.parse(s) as T;
   }
 }

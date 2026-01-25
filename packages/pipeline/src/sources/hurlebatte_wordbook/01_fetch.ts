@@ -1,4 +1,4 @@
-import { type FetchPlan } from "../../stages/01_fetch";
+import type { FetchPlan } from "../../stages/01_fetch";
 
 const SPREADSHEET_ID = "1y8_11RDvuCRyUK_MXj5K7ZjccgCUDapsPDI5PjaEkMw";
 

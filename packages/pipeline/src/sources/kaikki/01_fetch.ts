@@ -1,4 +1,4 @@
-import { type FetchPlan } from "../../stages/01_fetch";
+import type { FetchPlan } from "../../stages/01_fetch";
 
 export function fetchPlan(): FetchPlan {
   const url = "https://kaikki.org/dictionary/English/kaikki.org-dictionary-English.jsonl";

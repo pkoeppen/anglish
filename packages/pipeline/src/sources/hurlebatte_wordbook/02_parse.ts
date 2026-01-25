@@ -1,8 +1,8 @@
-import "colors";
-import crypto from "node:crypto";
 import type { ParseInput } from "../../stages/02_parse";
+import crypto from "node:crypto";
+import "colors";
 
-export type HurlebatteSourceRecord = {
+export interface HurlebatteSourceRecord {
   v: 1;
   source: "hurlebatte";
   rawId: string;
@@ -15,7 +15,7 @@ export type HurlebatteSourceRecord = {
   notes_raw: string;
   tags_raw: string;
   meta?: Record<string, unknown>;
-};
+}
 
 export async function parse(input: ParseInput): Promise<{
   records: HurlebatteSourceRecord[];
@@ -24,9 +24,10 @@ export async function parse(input: ParseInput): Promise<{
     throw new Error("Hurlebatte parser requires full content, but received a stream.");
   }
   const rows = parseCSV(input.content);
-  if (rows.length === 0) return { records: [] };
+  if (rows.length === 0)
+    return { records: [] };
 
-  const header = rows[0].map((s) => s.trim().toUpperCase());
+  const header = rows[0].map(s => s.trim().toUpperCase());
   const dataRows = rows.slice(1);
 
   // WORD,SPELLING,DEFINITION,WORD CLASS,ETYMOLOGY,LANG ORIGIN ‹×,NOTES,TAGS
@@ -36,7 +37,7 @@ export async function parse(input: ParseInput): Promise<{
     definition: header.indexOf("DEFINITION"),
     wordClass: header.indexOf("WORD CLASS"),
     etymology: header.indexOf("ETYMOLOGY"),
-    langOrigin: header.indexOf("LANG. ORIGIN  ‹×"),
+    langOrigin: header.indexOf("LANG ORIGIN ‹×"),
     notes: header.indexOf("NOTES"),
     tags: header.indexOf("TAGS"),
   };
@@ -48,7 +49,8 @@ export async function parse(input: ParseInput): Promise<{
 
   for (const r of dataRows) {
     const lemma_raw = get(r, idx.entry);
-    if (!lemma_raw) continue;
+    if (!lemma_raw)
+      continue;
 
     const pos_raw = get(r, idx.wordClass);
     const origin_raw = get(r, idx.langOrigin);
@@ -113,10 +115,10 @@ function parseCSV(csv: string): string[][] {
     const ch = s[i];
 
     if (inQuotes) {
-      if (ch === '"') {
+      if (ch === "\"") {
         const next = s[i + 1];
-        if (next === '"') {
-          field += '"';
+        if (next === "\"") {
+          field += "\"";
           i += 2;
           continue;
         }
@@ -129,7 +131,7 @@ function parseCSV(csv: string): string[][] {
       continue;
     }
 
-    if (ch === '"') {
+    if (ch === "\"") {
       inQuotes = true;
       i += 1;
       continue;
@@ -143,14 +145,16 @@ function parseCSV(csv: string): string[][] {
     }
 
     if (ch === "\n" || ch === "\r") {
-      if (ch === "\r" && s[i + 1] === "\n") i += 2;
+      if (ch === "\r" && s[i + 1] === "\n")
+        i += 2;
       else i += 1;
 
       row.push(field);
       field = "";
 
-      const isBlank = row.every((x) => (x ?? "").trim() === "");
-      if (!isBlank) out.push(row);
+      const isBlank = row.every(x => (x ?? "").trim() === "");
+      if (!isBlank)
+        out.push(row);
 
       row = [];
       continue;
@@ -161,8 +165,9 @@ function parseCSV(csv: string): string[][] {
   }
 
   row.push(field);
-  const isBlank = row.every((x) => (x ?? "").trim() === "");
-  if (!isBlank) out.push(row);
+  const isBlank = row.every(x => (x ?? "").trim() === "");
+  if (!isBlank)
+    out.push(row);
 
   return out;
 }

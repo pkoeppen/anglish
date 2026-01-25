@@ -1,20 +1,20 @@
-import * as cheerio from "cheerio";
-import crypto from "node:crypto";
 import type { ParseInput } from "../../stages/02_parse";
+import crypto from "node:crypto";
+import * as cheerio from "cheerio";
 
-export type Cell = {
+export interface Cell {
   text: string;
   html: string;
-};
+}
 
-type ParsedRowBase = {
+interface ParsedRowBase {
   dictionary: "english_to_anglish" | "anglish_to_english";
   page_id: string;
   occurrence_index: number;
   lemma_raw: string;
   pos_raw: string;
   cells_raw: Record<string, Cell>;
-};
+}
 
 type ParsedE2A = ParsedRowBase & {
   dictionary: "english_to_anglish";
@@ -53,7 +53,7 @@ export async function parse(input: ParseInput): Promise<{
   const rows = Array.from($("table > tbody > tr"));
 
   rows.forEach((el) => {
-    const cells = Array.from($(el).children("td")).map((cell) => ({
+    const cells = Array.from($(el).children("td")).map(cell => ({
       text: $(cell).text().trim(),
       html: $(cell).html()?.trim() || "",
     }));
@@ -62,7 +62,8 @@ export async function parse(input: ParseInput): Promise<{
       if (cells.length === 4) {
         const [word, pos, attested, unattested] = cells;
 
-        if (!word.text) return;
+        if (!word.text)
+          return;
 
         const identityKey = `${word.text}:${pos.text}`;
         const occurrence_index = occurrenceCounters.get(identityKey) ?? 0;
@@ -75,10 +76,10 @@ export async function parse(input: ParseInput): Promise<{
           lemma_raw: word.text,
           pos_raw: pos.text,
           cells_raw: {
-            word: word,
-            pos: pos,
-            attested: attested,
-            unattested: unattested,
+            word,
+            pos,
+            attested,
+            unattested,
           },
           attested_raw: attested,
           unattested_raw: unattested,
@@ -105,11 +106,13 @@ export async function parse(input: ParseInput): Promise<{
           ...data,
         });
       }
-    } else {
+    }
+    else {
       if (cells.length === 3) {
         const [word, pos, definition] = cells;
 
-        if (!word.text) return;
+        if (!word.text)
+          return;
 
         const identityKey = `${word.text}:${pos.text}`;
         const occurrence_index = occurrenceCounters.get(identityKey) ?? 0;
@@ -122,9 +125,9 @@ export async function parse(input: ParseInput): Promise<{
           lemma_raw: word.text,
           pos_raw: pos.text,
           cells_raw: {
-            word: word,
-            pos: pos,
-            definition: definition,
+            word,
+            pos,
+            definition,
           },
           definition_raw: definition,
           origin_raw: null,

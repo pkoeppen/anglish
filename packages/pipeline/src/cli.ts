@@ -1,28 +1,41 @@
 import path from "node:path";
-import { fetchPlan as anglishMootFetchPlan } from "./sources/anglish_moot";
-import { normalize as normalizeAnglishMoot } from "./sources/anglish_moot/normalize";
-import { parse as parseAnglishMoot } from "./sources/anglish_moot/parse";
-import { fetchPlan as hurlebatteFetchPlan } from "./sources/hurlebatte_wordbook";
-import { normalize as normalizeHurlebatte } from "./sources/hurlebatte_wordbook/normalize";
-import { parse as parseHurlebatte } from "./sources/hurlebatte_wordbook/parse";
-import { fetchPlan as kaikkiFetchPlan } from "./sources/kaikki";
-import { parse as parseKaikki } from "./sources/kaikki/parse";
+import process from "node:process";
+import { dataRoot, repoRoot } from "./constants";
+import {
+  fetchPlan as anglishMootFetchPlan,
+  normalize as normalizeAnglishMoot,
+  parse as parseAnglishMoot,
+} from "./sources/anglish_moot";
+import {
+  fetchPlan as hurlebatteFetchPlan,
+  normalize as normalizeHurlebatte,
+  parse as parseHurlebatte,
+} from "./sources/hurlebatte_wordbook";
+import {
+  fetchPlan as kaikkiFetchPlan,
+  normalize as normalizeKaikki,
+  parse as parseKaikki,
+} from "./sources/kaikki";
 import { runFetchStage } from "./stages/01_fetch";
 import { runParseStage } from "./stages/02_parse";
 import { runNormalizeStage } from "./stages/03_normalize";
+import { runMergeStage } from "./stages/04_merge";
+import { verifySynsetEmbeddings, verifyWordnet } from "./wordnet";
 
 type Cmd = "fetch" | "parse" | "normalize" | "merge" | "map";
 
 const argv = process.argv.slice(2);
 const cmd = (argv[0] ?? "") as Cmd;
 const flags = new Set(argv.slice(1));
-
 const force = flags.has("--force");
+const verbose = flags.has("--verbose");
 
-const repoRoot = path.resolve(process.cwd(), "../..");
-const dataRoot = path.join(repoRoot, "data/anglish");
+await verifyWordnet();
+await verifySynsetEmbeddings();
 
 if (cmd === "fetch") {
+  console.log("=== STAGE: FETCH ===");
+
   const outDir = path.join(dataRoot, "01_fetch");
   await runFetchStage([hurlebatteFetchPlan(), await anglishMootFetchPlan(), kaikkiFetchPlan()], {
     outDir,
@@ -32,8 +45,11 @@ if (cmd === "fetch") {
     retryBaseDelayMs: 750,
     userAgent: "anglish-pipeline/0.1 (+local dev)",
     force,
+    verbose,
   });
-} else if (cmd === "parse") {
+}
+else if (cmd === "parse") {
+  console.log("=== STAGE: PARSE ===");
   await runParseStage(
     {
       hurlebatte: parseHurlebatte,
@@ -42,15 +58,23 @@ if (cmd === "fetch") {
     },
     { repoRoot, dataRoot },
   );
-} else if (cmd === "normalize") {
+}
+else if (cmd === "normalize") {
+  console.log("=== STAGE: NORMALIZE ===");
   await runNormalizeStage(
     {
       anglish_moot: normalizeAnglishMoot,
       hurlebatte: normalizeHurlebatte,
+      kaikki: normalizeKaikki,
     },
-    { dataRoot, force },
+    { dataRoot, force, verbose, concurrency: 10 },
   );
-} else {
+}
+else if (cmd === "merge") {
+  console.log("=== STAGE: MERGE ===");
+  await runMergeStage({ dataRoot, force, verbose });
+}
+else {
   process.stderr.write(`Usage: tsx src/cli.ts <fetch|parse|normalize|merge|map> [--force]\n`);
   process.exit(1);
 }

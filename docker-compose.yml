@@ -1,0 +1,28 @@
+name: anglish
+services:
+  postgres:
+    container_name: anglish-postgres
+    image: postgres:latest
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - anglish-postgres-data:/var/lib/postgresql/data
+
+  redis:
+    container_name: anglish-redis
+    image: redis/redis-stack:latest
+    restart: always
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_INSIGHT_PORT:-8001}:8001"
+    volumes:
+      - anglish-redis-data:/data
+
+volumes:
+  anglish-postgres-data:
+  anglish-redis-data:

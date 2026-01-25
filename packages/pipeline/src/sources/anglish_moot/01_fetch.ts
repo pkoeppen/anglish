@@ -1,5 +1,5 @@
+import type { FetchPlan } from "../../stages/01_fetch";
 import * as cheerio from "cheerio";
-import { type FetchPlan } from "../../stages/01_fetch";
 
 const BASE_URL = "https://anglish.fandom.com";
 
@@ -35,13 +35,13 @@ export async function fetchPlan(): Promise<FetchPlan> {
     makeIndexJob({ url: englishIndexUrl, dictionary: "english_to_anglish" }),
     makeIndexJob({ url: anglishIndexUrl, dictionary: "anglish_to_english" }),
 
-    ...englishHrefs.map((href) =>
+    ...englishHrefs.map(href =>
       makeEntryJob({
         url: absolutizeWikiHref(href),
         dictionary: "english_to_anglish",
       }),
     ),
-    ...anglishHrefs.map((href) =>
+    ...anglishHrefs.map(href =>
       makeEntryJob({
         url: absolutizeWikiHref(href),
         dictionary: "anglish_to_english",
@@ -88,7 +88,8 @@ async function fetchWordbookHrefs(input: {
     method: "GET",
     headers: { accept: "text/html,*/*;q=0.9" },
   });
-  if (!res.ok) throw new Error(`Failed to fetch ${input.indexUrl}: HTTP ${res.status}`);
+  if (!res.ok)
+    throw new Error(`Failed to fetch ${input.indexUrl}: HTTP ${res.status}`);
 
   const html = await res.text();
   const $ = cheerio.load(html);
@@ -96,13 +97,15 @@ async function fetchWordbookHrefs(input: {
   const hrefs = Array.from($(input.selector).map((_, el) => $(el).attr("href")))
     .filter((x): x is string => typeof x === "string" && x.length > 0)
     // Keep only normal wiki links.
-    .filter((href) => href.startsWith("/wiki/"));
+    .filter(href => href.startsWith("/wiki/"));
 
   return [...new Set(hrefs)];
 }
 
 function absolutizeWikiHref(href: string): string {
-  if (href.startsWith("http://") || href.startsWith("https://")) return href;
-  if (!href.startsWith("/")) return `${BASE_URL}/${href}`;
+  if (href.startsWith("http://") || href.startsWith("https://"))
+    return href;
+  if (!href.startsWith("/"))
+    return `${BASE_URL}/${href}`;
   return `${BASE_URL}${href}`;
 }

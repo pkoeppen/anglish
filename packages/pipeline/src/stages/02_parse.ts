@@ -1,13 +1,13 @@
+import type { AnglishMootSourceRecord } from "../sources/anglish_moot/02_parse";
+import type { HurlebatteSourceRecord } from "../sources/hurlebatte_wordbook/02_parse";
+import type { KaikkiSourceRecord } from "../sources/kaikki/02_parse";
+import type { FetchManifestRow, JobMetadata } from "./01_fetch";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
-import { type AnglishMootSourceRecord } from "../sources/anglish_moot/parse";
-import { type HurlebatteSourceRecord } from "../sources/hurlebatte_wordbook/parse";
-import { type KaikkiSourceRecord } from "../sources/kaikki/parse";
-import type { FetchManifestRow, JobMetadata } from "./01_fetch";
 
-export type ParseManifestRow = {
+export interface ParseManifestRow {
   id: string;
   source: string;
   inputFetchId: string;
@@ -15,23 +15,21 @@ export type ParseManifestRow = {
   outputPath: string;
   records: number;
   parsedAt: string;
-};
+}
 
-export type ParseStageConfig = {
+export interface ParseStageConfig {
   repoRoot: string;
   dataRoot: string;
-};
+}
 
 type AnySourceRecord = HurlebatteSourceRecord | AnglishMootSourceRecord | KaikkiSourceRecord;
 
-export type ParseInput = {
-  /** The full content of the fetched file. Mutually exclusive with `stream`. */
-  content?: string;
-  /** A stream of the fetched file. Mutually exclusive with `content`. */
-  stream?: fs.ReadStream;
+export interface ParseInput {
+  content?: string; // Full content of the fetched file.
+  stream?: fs.ReadStream; // Stream of the fetched file.
   jobMeta?: JobMetadata;
   fetch: { id: string; url: string; fetchedAt: string };
-};
+}
 
 export type SourceParser = (input: ParseInput) => Promise<{
   records: AnySourceRecord[] | AsyncGenerator<AnySourceRecord> | Iterable<AnySourceRecord>;
@@ -54,9 +52,11 @@ export async function runParseStage(
 
   const recordWriters = new Map<string, fs.WriteStream>();
   const issueWriters = new Map<string, fs.WriteStream>();
+
   const ensureRecordWriter = (source: string) => {
     const existing = recordWriters.get(source);
-    if (existing) return existing;
+    if (existing)
+      return existing;
     const p = path.join(outRecordsDir, `${source}.source_records.jsonl`);
     const w = fs.createWriteStream(p, { flags: "w" });
     recordWriters.set(source, w);
@@ -65,17 +65,18 @@ export async function runParseStage(
 
   const results: ParseManifestRow[] = [];
 
-  // Latest-only parsing: each run overwrites parse outputs/manifests based on the
-  // most recent successful fetch per (source, requestId).
   await fsp.writeFile(outManifest, "", "utf8");
 
   // Select latest successful fetch per (source, requestId). We use fetchedAt if
   // available; if it ties or is missing, later rows win.
   const latestByRequest = new Map<string, FetchManifestRow>();
   for await (const row of readJsonl<FetchManifestRow>(inManifest)) {
-    if (!row.ok) continue;
-    if (!row.rawPath) continue;
-    if (!row.requestId) continue;
+    if (!row.ok)
+      continue;
+    if (!row.rawPath)
+      continue;
+    if (!row.requestId)
+      continue;
 
     const key = `${row.source}:${row.requestId}`;
     const prev = latestByRequest.get(key);
@@ -87,15 +88,19 @@ export async function runParseStage(
     const tPrev = Date.parse(prev.fetchedAt ?? "");
     const tNext = Date.parse(row.fetchedAt ?? "");
     if (Number.isFinite(tNext) && Number.isFinite(tPrev)) {
-      if (tNext >= tPrev) latestByRequest.set(key, row);
-    } else {
+      if (tNext >= tPrev)
+        latestByRequest.set(key, row);
+    }
+    else {
       latestByRequest.set(key, row);
     }
   }
 
-  for (const row of latestByRequest.values()) {
-    if (!row.rawPath) continue;
-    if (!row.requestId) continue;
+  for (const [key, row] of latestByRequest.entries()) {
+    if (!row.rawPath)
+      continue;
+    if (!row.requestId)
+      continue;
 
     const parser = parsers[row.source];
     if (!parser) {
@@ -103,8 +108,9 @@ export async function runParseStage(
       continue;
     }
 
-    const rawPathAbs = resolveMaybeRelative(config.repoRoot, row.rawPath);
+    console.log(`Running parser (${key})`);
 
+    const rawPathAbs = resolveMaybeRelative(config.repoRoot, row.rawPath);
     const input: ParseInput = {
       jobMeta: row.jobMeta,
       fetch: { id: row.id, url: row.url, fetchedAt: row.fetchedAt || "" },
@@ -112,7 +118,8 @@ export async function runParseStage(
 
     if (row.stream) {
       input.stream = fs.createReadStream(rawPathAbs, { encoding: "utf8" });
-    } else {
+    }
+    else {
       input.content = await fsp.readFile(rawPathAbs, "utf8");
     }
 
@@ -121,7 +128,7 @@ export async function runParseStage(
     const recordWriter = ensureRecordWriter(row.source);
     let recordCount = 0;
     for await (const rec of records) {
-      recordWriter.write(JSON.stringify(rec) + "\n");
+      recordWriter.write(`${JSON.stringify(rec)}\n`);
       recordCount++;
     }
 
@@ -139,12 +146,12 @@ export async function runParseStage(
     };
 
     results.push(manifestRow);
-    await fsp.appendFile(outManifest, JSON.stringify(manifestRow) + "\n", "utf8");
+    await fsp.appendFile(outManifest, `${JSON.stringify(manifestRow)}\n`, "utf8");
   }
 
   await Promise.all(
     [...recordWriters.values(), ...issueWriters.values()].map(
-      (w) =>
+      w =>
         new Promise<void>((resolve, reject) => {
           w.end(() => resolve());
           w.on("error", reject);
@@ -161,12 +168,14 @@ async function* readJsonl<T>(filePath: string): AsyncGenerator<T> {
 
   for await (const line of rl) {
     const s = line.trim();
-    if (!s) continue;
+    if (!s)
+      continue;
     yield JSON.parse(s) as T;
   }
 }
 
 function resolveMaybeRelative(repoRoot: string, p: string) {
-  if (path.isAbsolute(p)) return p;
+  if (path.isAbsolute(p))
+    return p;
   return path.join(repoRoot, p);
 }

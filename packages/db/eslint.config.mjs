@@ -1,6 +1,14 @@
-import baseNodeConfig from "@anglish/config/eslint/node";
-import { defineConfig } from "eslint/config";
+import antfu from "@antfu/eslint-config";
 
-const eslintConfig = defineConfig([...baseNodeConfig]);
+export default antfu({
+  node: true,
+  stylistic: {
+    indent: 2,
+    quotes: "double",
+    semi: true,
+  },
+  rules: {
+    "no-console": "off",
+  },
+});
 
-export default eslintConfig;

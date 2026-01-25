@@ -16,7 +16,9 @@
   "files": [
     "dist"
   ],
-  "scripts": {},
+  "scripts": {
+    "build": "tsc -b"
+  },
   "devDependencies": {
     "@anglish/config": "workspace:*",
     "winston": "^3.19.0"

@@ -1,13 +1,14 @@
-import * as cheerio from "cheerio";
-import "colors";
 import crypto from "node:crypto";
 import { createWriteStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import * as cheerio from "cheerio";
+import { makeLimiter } from "../util";
+import "colors";
 
-export type FetchMetadata = {
+export interface FetchMetadata {
   id: string;
   requestId: string;
   source: string;
@@ -22,11 +23,11 @@ export type FetchMetadata = {
     method: string;
     headers: Record<string, string>;
   };
-};
+}
 
 export type JobMetadata = Record<string, unknown>;
 
-export type FetchJob = {
+export interface FetchJob {
   source: string;
   kind: "html" | "json" | "jsonl" | "text" | "csv";
   url: string;
@@ -36,9 +37,9 @@ export type FetchJob = {
   stream?: boolean;
   timeoutMs?: number;
   meta?: JobMetadata;
-};
+}
 
-export type FetchManifestRow = {
+export interface FetchManifestRow {
   id: string;
   requestId: string;
   source: string;
@@ -54,22 +55,23 @@ export type FetchManifestRow = {
   stream: boolean;
   rawPath?: string;
   jobMeta?: JobMetadata;
-};
+}
 
-export type FetchStageConfig = {
+export interface FetchStageConfig {
   outDir: string;
   concurrency: number;
   timeoutMs: number;
   retries: number;
   retryBaseDelayMs: number;
   userAgent: string;
-  force: boolean;
-};
+  force?: boolean;
+  verbose?: boolean;
+}
 
-export type FetchPlan = {
+export interface FetchPlan {
   source: string;
   jobs: FetchJob[];
-};
+}
 
 export async function runFetchStage(
   plans: FetchPlan[],
@@ -79,13 +81,13 @@ export async function runFetchStage(
   await fs.mkdir(rawDir, { recursive: true });
   const manifestPath = path.join(config.outDir, "manifest.01_fetch.jsonl");
 
-  const jobs = plans.flatMap((p) => p.jobs.map((j) => ({ ...j, source: p.source })));
+  const jobs = plans.flatMap(p => p.jobs.map(j => ({ ...j, source: p.source })));
 
   const rows: FetchManifestRow[] = [];
   const run = makeLimiter(config.concurrency);
 
   await Promise.all(
-    jobs.map((job) =>
+    jobs.map(job =>
       run(async () => {
         const row = await fetchOne(job, rawDir, config).catch((e) => {
           const requestId = requestIdFromJob(job);
@@ -110,7 +112,7 @@ export async function runFetchStage(
         });
 
         rows.push(row);
-        await fs.appendFile(manifestPath, JSON.stringify(row) + "\n", "utf8");
+        await fs.appendFile(manifestPath, `${JSON.stringify(row)}\n`, "utf8");
       }),
     ),
   );
@@ -155,7 +157,8 @@ async function fetchOne(
         }
 
         if (job.stream) {
-          if (!res.body) throw new Error("Response body is empty");
+          if (!res.body)
+            throw new Error("Response body is empty");
           const tempPath = path.join(rawDir, `${job.source}.${requestId}.tmp`);
           const hash = crypto.createHash("sha256");
           let bytes = 0;
@@ -176,7 +179,7 @@ async function fetchOne(
                 if (now - lastLogAt > 1000) {
                   lastLogAt = now;
                   const mb = (bytes / 1024 / 1024).toFixed(1);
-                  console.log(`  Progress ${job.url}: ${mb}MB`);
+                  console.log(`- Progress ${job.url}: ${mb}MB`);
                 }
 
                 yield chunk;
@@ -187,12 +190,15 @@ async function fetchOne(
 
           const id = hash.digest("hex").slice(0, 16);
           return { res, id, bytes, tempPath };
-        } else {
+        }
+        else {
           const buf = new Uint8Array(await res.arrayBuffer());
           return { res, buf };
         }
-      } finally {
-        if (t) clearTimeout(t);
+      }
+      finally {
+        if (t)
+          clearTimeout(t);
       }
     },
     {
@@ -200,9 +206,12 @@ async function fetchOne(
       baseDelayMs: config.retryBaseDelayMs,
       retryOn: (e) => {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("aborted")) return true;
-        if (msg.includes("ECONNRESET")) return true;
-        if (msg.includes("ETIMEDOUT")) return true;
+        if (msg.includes("aborted"))
+          return true;
+        if (msg.includes("ECONNRESET"))
+          return true;
+        if (msg.includes("ETIMEDOUT"))
+          return true;
         const status = (e as Error & { status: number })?.status;
         if (typeof status === "number" && (status === 429 || (status >= 500 && status <= 599)))
           return true;
@@ -222,7 +231,8 @@ async function fetchOne(
     id = artifactIdFromBytesForJob(job, r.buf);
     bytes = r.buf.byteLength;
     buf = r.buf;
-  } else {
+  }
+  else {
     const r = result as { id: string; bytes: number; tempPath: string };
     id = r.id;
     bytes = r.bytes;
@@ -239,10 +249,12 @@ async function fetchOne(
   if (!hit || config.force) {
     if (buf) {
       await fs.writeFile(rawPath, buf);
-    } else if (tempPath) {
+    }
+    else if (tempPath) {
       await fs.rename(tempPath, rawPath);
     }
-  } else if (tempPath) {
+  }
+  else if (tempPath) {
     await fs.unlink(tempPath).catch(() => {});
   }
 
@@ -295,7 +307,8 @@ function requestIdFromJob(job: FetchJob): string {
   h.update(job.url);
   h.update("\n");
   if (job.body) {
-    if (typeof job.body === "string") h.update(job.body);
+    if (typeof job.body === "string")
+      h.update(job.body);
     else h.update(job.body);
   }
   return h.digest("hex").slice(0, 16);
@@ -318,7 +331,8 @@ function artifactIdFromBytes(buf: Uint8Array): string {
  * parse from the page.
  */
 function artifactIdFromBytesForJob(job: FetchJob, buf: Uint8Array): string {
-  if (job.kind !== "html") return artifactIdFromBytes(buf);
+  if (job.kind !== "html")
+    return artifactIdFromBytes(buf);
   return artifactIdFromBytes(canonicalizeHtmlForHash(buf));
 }
 
@@ -344,7 +358,8 @@ function canonicalizeHtmlForHash(buf: Uint8Array): Uint8Array {
     // Normalize whitespace to reduce churn.
     const normalized = serialized.replace(/\s+/g, " ").trim();
     return new TextEncoder().encode(normalized);
-  } catch {
+  }
+  catch {
     // If parsing fails, fall back to a cheap string-based normalization.
     // Try to extract body with regex first.
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
@@ -377,31 +392,10 @@ async function exists(p: string): Promise<boolean> {
   try {
     await fs.stat(p);
     return true;
-  } catch {
+  }
+  catch {
     return false;
   }
-}
-
-function makeLimiter(concurrency: number) {
-  let active = 0;
-  const queue: Array<() => void> = [];
-
-  const next = () => {
-    active--;
-    const fn = queue.shift();
-    if (fn) fn();
-  };
-
-  return async <T>(fn: () => Promise<T>): Promise<T> =>
-    new Promise<T>((resolve, reject) => {
-      const run = () => {
-        active++;
-        fn().then(resolve, reject).finally(next);
-      };
-
-      if (active < concurrency) run();
-      else queue.push(run);
-    });
 }
 
 async function withRetries<T>(
@@ -416,17 +410,19 @@ async function withRetries<T>(
   for (;;) {
     try {
       return await fn();
-    } catch (e) {
+    }
+    catch (e) {
       attempt++;
-      if (attempt > options.retries || !options.retryOn(e)) throw e;
-      const delay = jitter(options.baseDelayMs * Math.pow(2, attempt - 1));
+      if (attempt > options.retries || !options.retryOn(e))
+        throw e;
+      const delay = jitter(options.baseDelayMs * 2 ** (attempt - 1));
       await sleep(delay);
     }
   }
 }
 
 function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+  return new Promise(r => setTimeout(r, ms));
 }
 
 function jitter(ms: number) {

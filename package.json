@@ -7,23 +7,25 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "etl": "pnpm --filter @anglish/pipeline run etl",
-    "etl:fetch": "pnpm --filter @anglish/pipeline run fetch",
-    "etl:parse": "pnpm --filter @anglish/pipeline run parse",
-    "etl:normalize": "pnpm --filter @anglish/pipeline run normalize",
-    "etl:merge": "pnpm --filter @anglish/pipeline run merge",
-    "etl:map": "pnpm --filter @anglish/pipeline run map",
+    "etl": "dotenv -- pnpm --filter @anglish/pipeline run etl",
+    "etl:fetch": "dotenv -- pnpm --filter @anglish/pipeline run fetch",
+    "etl:parse": "dotenv -- pnpm --filter @anglish/pipeline run parse",
+    "etl:normalize": "dotenv -- pnpm --filter @anglish/pipeline run normalize",
+    "etl:merge": "dotenv -- pnpm --filter @anglish/pipeline run merge",
+    "etl:map": "dotenv -- pnpm --filter @anglish/pipeline run map",
     "etl:clean": "rm -rf data/anglish"
   },
   "devDependencies": {
+    "@antfu/eslint-config": "^7.2.0",
     "@eslint/js": "^9.39.2",
     "@trivago/prettier-plugin-sort-imports": "6.0.0",
     "@types/node": "20.19.27",
+    "dotenv-cli": "11.0.0",
     "eslint": "9.39.2",
     "eslint-config-prettier": "10.1.8",
     "prettier": "3.7.4",
     "typescript": "5.9.3",
-    "typescript-eslint": "^8.50.0"
+    "typescript-eslint": "^8.53.1"
   },
   "pnpm": {
     "overrides": {
