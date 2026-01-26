@@ -20,7 +20,8 @@ import { runFetchStage } from "./stages/01_fetch";
 import { runParseStage } from "./stages/02_parse";
 import { runNormalizeStage } from "./stages/03_normalize";
 import { runMergeStage } from "./stages/04_merge";
-import { verifySynsetEmbeddings, verifyWordnet } from "./wordnet";
+import { runMapStage } from "./stages/05_map";
+import { verifySynsetEmbeddings, verifyWordnet } from "./wordnet/wordnet";
 
 type Cmd = "fetch" | "parse" | "normalize" | "merge" | "map";
 
@@ -73,6 +74,10 @@ else if (cmd === "normalize") {
 else if (cmd === "merge") {
   console.log("=== STAGE: MERGE ===");
   await runMergeStage({ dataRoot, force, verbose });
+}
+else if (cmd === "map") {
+  console.log("=== STAGE: MAP ===");
+  await runMapStage({ dataRoot, force, verbose });
 }
 else {
   process.stderr.write(`Usage: tsx src/cli.ts <fetch|parse|normalize|merge|map> [--force]\n`);

@@ -4,10 +4,9 @@ import type { NormalizedRecord } from "./03_normalize";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import * as readline from "node:readline";
 import OpenAI from "openai";
-import { wordRegex } from "../util";
-import { loadWordnet } from "../wordnet";
+import { readJsonl, wordRegex } from "../util";
+import { loadWordnet } from "../wordnet/wordnet";
 
 const openai = new OpenAI();
 
@@ -29,7 +28,7 @@ export interface MergeStageConfig {
 export interface MergedRecord {
   v: 1;
   lemma: string;
-  pos: string;
+  pos: WordnetPOS;
   glosses: string[];
   origins: WordOrigin[];
   sources: string[];
@@ -78,7 +77,7 @@ export async function defaultMerge(records: NormalizedRecord[], mergedAt: string
   const merged: MergedRecord[] = [];
 
   for (const [key, group] of groups.entries()) {
-    const [lemma, pos] = key.split(":", 2);
+    const [lemma, pos] = key.split(":", 2) as [string, WordnetPOS];
 
     // Collect unique glosses
     const glossSet = new Set<string>();
@@ -223,18 +222,6 @@ export async function runMergeStage(
   await fsp.appendFile(outManifest, `${JSON.stringify(manifestRow)}\n`, "utf8");
 
   return results;
-}
-
-async function* readJsonl<T>(filePath: string): AsyncGenerator<T> {
-  const stream = fs.createReadStream(filePath, { encoding: "utf8" });
-  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
-
-  for await (const line of rl) {
-    const s = line.trim();
-    if (!s)
-      continue;
-    yield JSON.parse(s) as T;
-  }
 }
 
 async function gptDedupeGlosses(word: string, pos: WordnetPOS, glosses: string[]): Promise<string[] | null> {

@@ -163,7 +163,7 @@ async function fetchOne(
           const hash = crypto.createHash("sha256");
           let bytes = 0;
           const writeStream = createWriteStream(tempPath);
-          const body = Readable.fromWeb(res.body as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+          const body = Readable.fromWeb(res.body as any);
 
           let lastLogAt = 0;
 

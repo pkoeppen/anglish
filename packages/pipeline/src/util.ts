@@ -1,7 +1,21 @@
-import type { SynsetVec } from "./wordnet";
+import type { SynsetVec } from "./wordnet/embedding";
+import * as fs from "node:fs";
+import * as readline from "node:readline";
 
 export const wordPattern = `\\p{L}+(?:[-\\s']\\p{L}+){0,4}`;
 export const wordRegex = new RegExp(`^${wordPattern}$`, "iu");
+
+export async function* readJsonl<T>(filePath: string): AsyncGenerator<T> {
+  const stream = fs.createReadStream(filePath, { encoding: "utf8" });
+  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+
+  for await (const line of rl) {
+    const s = line.trim();
+    if (!s)
+      continue;
+    yield JSON.parse(s) as T;
+  }
+}
 
 export function makeLimiter(
   concurrency: number,
@@ -12,8 +26,10 @@ export function makeLimiter(
   const startTimes: number[] = [];
 
   const canStart = (): boolean => {
-    if (active >= concurrency) return false;
-    if (ratePerSecond === undefined) return true;
+    if (active >= concurrency)
+      return false;
+    if (ratePerSecond === undefined)
+      return true;
 
     const now = Date.now();
     const oneSecondAgo = now - 1000;
@@ -25,7 +41,8 @@ export function makeLimiter(
   };
 
   const tryNext = () => {
-    if (queue.length === 0) return;
+    if (queue.length === 0)
+      return;
 
     if (canStart()) {
       const fn = queue.shift();
@@ -36,7 +53,8 @@ export function makeLimiter(
         }
         fn();
       }
-    } else if (ratePerSecond !== undefined && active < concurrency) {
+    }
+    else if (ratePerSecond !== undefined && active < concurrency) {
       // We have concurrency available but are rate limited
       // Schedule a retry after the oldest operation becomes eligible
       const oldestStart = startTimes[0];
@@ -66,7 +84,8 @@ export function makeLimiter(
           startTimes.push(Date.now());
         }
         run();
-      } else {
+      }
+      else {
         queue.push(run);
       }
     });

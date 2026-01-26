@@ -5,8 +5,7 @@ import type { KaikkiSourceRecord } from "../sources/kaikki/02_parse";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import * as readline from "node:readline";
-import { makeLimiter } from "../util";
+import { makeLimiter, readJsonl } from "../util";
 
 export interface NormalizeManifestRow {
   id: string;
@@ -143,16 +142,4 @@ export async function runNormalizeStage(
   }
 
   return results;
-}
-
-async function* readJsonl<T>(filePath: string): AsyncGenerator<T> {
-  const stream = fs.createReadStream(filePath, { encoding: "utf8" });
-  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
-
-  for await (const line of rl) {
-    const s = line.trim();
-    if (!s)
-      continue;
-    yield JSON.parse(s) as T;
-  }
 }

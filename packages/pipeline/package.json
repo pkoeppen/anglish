@@ -24,9 +24,10 @@
     "normalize": "tsx src/cli.ts normalize",
     "merge": "tsx src/cli.ts merge",
     "map": "tsx src/cli.ts map",
-    "wordnet:fetch": "dotenv -e ../../.env -- tsx src/wordnet.ts fetch",
-    "wordnet:embed": "dotenv -e ../../.env -- tsx src/wordnet.ts embed",
-    "wordnet:load": "dotenv -e ../../.env -- tsx src/wordnet.ts load"
+    "wordnet:fetch": "dotenv -e ../../.env -- tsx src/wordnet/cli.ts fetch",
+    "wordnet:embed": "dotenv -e ../../.env -- tsx src/wordnet/cli.ts embed",
+    "wordnet:load": "dotenv -e ../../.env -- tsx src/wordnet/cli.ts load",
+    "wordnet:index": "dotenv -e ../../.env -- tsx src/wordnet/cli.ts index"
   },
   "devDependencies": {
     "@anglish/config": "workspace:*",

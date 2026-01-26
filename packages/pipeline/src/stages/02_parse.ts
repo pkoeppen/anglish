@@ -5,7 +5,7 @@ import type { FetchManifestRow, JobMetadata } from "./01_fetch";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import readline from "node:readline";
+import { readJsonl } from "../util";
 
 export interface ParseManifestRow {
   id: string;
@@ -160,18 +160,6 @@ export async function runParseStage(
   );
 
   return results;
-}
-
-async function* readJsonl<T>(filePath: string): AsyncGenerator<T> {
-  const stream = fs.createReadStream(filePath, { encoding: "utf8" });
-  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
-
-  for await (const line of rl) {
-    const s = line.trim();
-    if (!s)
-      continue;
-    yield JSON.parse(s) as T;
-  }
 }
 
 function resolveMaybeRelative(repoRoot: string, p: string) {
