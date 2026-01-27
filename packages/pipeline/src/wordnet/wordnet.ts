@@ -1,3 +1,4 @@
+import type { WordnetPOS } from "@anglish/core";
 import type { WordnetEntry, WordnetSynset } from "../types";
 import type { SynsetVec } from "./embedding";
 import { Buffer } from "node:buffer";
@@ -8,6 +9,7 @@ import * as process from "node:process";
 import { redis } from "@anglish/db";
 import yaml from "yaml";
 import { dataRoot, repoRoot } from "../constants";
+import { getCategoriesByPOS } from "./categories";
 import "colors";
 
 export async function verifyWordnet() {
@@ -70,39 +72,19 @@ export function loadWordnet(): { entries: Record<string, WordnetEntry>; synsets:
   return { entries, synsets };
 }
 
-async function testVectorSearch() {
-  const indexKey = `idx:synsets_vss`;
-  const k = 20;
-  const query = `(* )=>[KNN ${k} @vector $query_vector AS vector_score]`;
+export function loadSynsetsWithCategory(): Record<string, WordnetSynset & { category: string }> {
+  const ewnJsonDir = path.join(dataRoot, "ewn-json");
+  const synsets: Record<string, WordnetSynset & { category: string }> = {};
+  const files = fs.readdirSync(ewnJsonDir).filter(f => /^(?:adj|adv|noun|verb)\.\w+\.json$/i.test(f));
 
-  const synsetId = `02086723-n`;
-
-  const q = await redis.json.get(`synset:${synsetId}`) as unknown as SynsetVec;
-  console.log(`Target:\t${q.headword.green}\n`);
-
-  const float32 = new Float32Array(q.embedding);
-  const bytes = Buffer.from(float32.buffer);
-
-  const results = await redis.ft.search(indexKey, query, {
-    SORTBY: "vector_score",
-    RETURN: ["vector_score"],
-    DIALECT: 2,
-    PARAMS: {
-      query_vector: bytes,
-    },
-    LIMIT: {
-      from: 0,
-      size: k,
-    },
-  });
-
-  for (const { id, value: { vector_score } } of results.documents) {
-    const synset = await redis.json.get(id) as unknown as SynsetVec;
-    const score = Number(vector_score).toFixed(3);
-    console.log(`Result:\t ${synset.headword.padEnd(20, " ").blue}${`(score: ${score})`.yellow}`);
+  for (const file of files) {
+    const category = file.split(".")[1];
+    const content = fs.readFileSync(path.join(ewnJsonDir, file), "utf8");
+    const json = JSON.parse(content) as Record<string, WordnetSynset>;
+    for (const [id, synset] of Object.entries(json)) {
+      synsets[id] = { ...synset, category };
+    }
   }
 
-  console.log();
-
-  process.exit(0);
+  return synsets;
 }

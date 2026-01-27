@@ -18,12 +18,13 @@ import {
 } from "./sources/kaikki";
 import { runFetchStage } from "./stages/01_fetch";
 import { runParseStage } from "./stages/02_parse";
-import { runNormalizeStage } from "./stages/03_normalize";
+import { runNormalizeStagePre } from "./stages/03_normalize_pre";
 import { runMergeStage } from "./stages/04_merge";
-import { runMapStage } from "./stages/05_map";
+import { runNormalizeStagePost } from "./stages/05_normalize_post";
+import { runMapStage } from "./stages/06_map";
 import { verifySynsetEmbeddings, verifyWordnet } from "./wordnet/wordnet";
 
-type Cmd = "fetch" | "parse" | "normalize" | "merge" | "map";
+type Cmd = "fetch" | "parse" | "normalize-pre" | "merge" | "normalize-post" | "map";
 
 const argv = process.argv.slice(2);
 const cmd = (argv[0] ?? "") as Cmd;
@@ -60,9 +61,9 @@ else if (cmd === "parse") {
     { repoRoot, dataRoot },
   );
 }
-else if (cmd === "normalize") {
+else if (cmd === "normalize-pre") {
   console.log("=== STAGE: NORMALIZE ===");
-  await runNormalizeStage(
+  await runNormalizeStagePre(
     {
       anglish_moot: normalizeAnglishMoot,
       hurlebatte: normalizeHurlebatte,
@@ -75,6 +76,10 @@ else if (cmd === "merge") {
   console.log("=== STAGE: MERGE ===");
   await runMergeStage({ dataRoot, force, verbose });
 }
+else if (cmd === "normalize-post") {
+  console.log("=== STAGE: NORMALIZE POST ===");
+  await runNormalizeStagePost({ dataRoot, force, verbose });
+}
 else if (cmd === "map") {
   console.log("=== STAGE: MAP ===");
   await runMapStage({ dataRoot, force, verbose });
@@ -83,3 +88,5 @@ else {
   process.stderr.write(`Usage: tsx src/cli.ts <fetch|parse|normalize|merge|map> [--force]\n`);
   process.exit(1);
 }
+
+process.exit(0);

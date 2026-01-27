@@ -8,8 +8,8 @@ import { redis } from "@anglish/db";
 import OpenAI from "openai";
 import { SCHEMA_FIELD_TYPE } from "redis";
 import { dataRoot } from "../constants";
-import { makeLimiter } from "../util";
-import { loadWordnet } from "./wordnet";
+import { makeLimiter, retry } from "../util";
+import { loadSynsetsWithCategory } from "./wordnet";
 import "colors";
 
 const openai = new OpenAI();
@@ -18,12 +18,16 @@ export const REDIS_SYNSET_EMBEDDING_INDEX_KEY = "idx:synsets_vss";
 
 export interface SynsetVec {
   id: string;
-  headword: string;
   pos: WordnetPOS;
+  category: string;
+  headword: string;
   embedding: number[];
 }
 
 export interface VectorSearchResult {
+  id: string;
+  pos: WordnetPOS;
+  category: string;
   headword: string;
   score: number;
 }
@@ -40,7 +44,7 @@ export async function createEmbedding(text: string) {
 export async function createSynsetEmbeddings() {
   const outFile = path.join(dataRoot, "synset_embeddings.jsonl");
   const outStream = fs.createWriteStream(outFile);
-  const { synsets } = loadWordnet();
+  const synsets = loadSynsetsWithCategory();
 
   const concurrency = 30;
   const run = makeLimiter(concurrency, 4500 / 60);
@@ -51,11 +55,13 @@ export async function createSynsetEmbeddings() {
     Object.entries(synsets).map(([id, synset]) =>
       run(async () => {
         const definition = synset.definition.shift()!;
-        const embedding = await createEmbedding(definition);
+        const embeddingText = `${synset.members.join(", ")} - ${definition}`;
+        const embedding = await retry(() => createEmbedding(embeddingText));
         const synsetVec: SynsetVec = {
           id,
-          headword: synset.members.shift()!,
           pos: synset.partOfSpeech as WordnetPOS,
+          category: synset.category,
+          headword: synset.members.shift()!,
           embedding,
         };
         outStream.write(`${JSON.stringify(synsetVec)}\n`);
@@ -152,6 +158,9 @@ export async function vectorSearch(text: string, pos: WordnetPOS, k = 20): Promi
   const synsets = await Promise.all(results.documents.map(async ({ id, value: { score } }) => {
     const synset = await redis.json.get(id) as unknown as SynsetVec;
     return {
+      id: synset.id,
+      pos: synset.pos,
+      category: synset.category,
       headword: synset.headword,
       score: Number(score),
     };

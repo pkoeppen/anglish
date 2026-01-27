@@ -10,8 +10,9 @@
     "etl": "dotenv -- pnpm --filter @anglish/pipeline run etl",
     "etl:fetch": "dotenv -- pnpm --filter @anglish/pipeline run fetch",
     "etl:parse": "dotenv -- pnpm --filter @anglish/pipeline run parse",
-    "etl:normalize": "dotenv -- pnpm --filter @anglish/pipeline run normalize",
+    "etl:normalize-pre": "dotenv -- pnpm --filter @anglish/pipeline run normalize-pre",
     "etl:merge": "dotenv -- pnpm --filter @anglish/pipeline run merge",
+    "etl:normalize-post": "dotenv -- pnpm --filter @anglish/pipeline run normalize-post",
     "etl:map": "dotenv -- pnpm --filter @anglish/pipeline run map",
     "etl:clean": "rm -rf data/anglish"
   },

@@ -1,6 +1,8 @@
 import type { SynsetVec } from "./wordnet/embedding";
 import * as fs from "node:fs";
 import * as readline from "node:readline";
+import { WordnetPOS } from "@anglish/core";
+import "colors";
 
 export const wordPattern = `\\p{L}+(?:[-\\s']\\p{L}+){0,4}`;
 export const wordRegex = new RegExp(`^${wordPattern}$`, "iu");
@@ -91,6 +93,24 @@ export function makeLimiter(
     });
 }
 
+export async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export async function retry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+  try {
+    return await fn();
+  }
+  catch (error) {
+    console.error(`Error: ${error}`.red);
+    if (retries > 0) {
+      sleep(delay);
+      return await retry(fn, retries - 1);
+    }
+    throw error;
+  }
+}
+
 export function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0;
   let na = 0;
@@ -118,4 +138,19 @@ export function searchNearest(
 
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, k);
+}
+
+export function wordnetReadablePOS(pos: WordnetPOS): string {
+  switch (pos) {
+    case WordnetPOS.Noun:
+      return "noun";
+    case WordnetPOS.Verb:
+      return "verb";
+    case WordnetPOS.Adjective:
+      return "adjective";
+    case WordnetPOS.Adverb:
+      return "adverb";
+    case WordnetPOS.Satellite:
+      return "satellite";
+  }
 }

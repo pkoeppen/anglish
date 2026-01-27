@@ -1,5 +1,5 @@
 import type { WordOrigin } from "@anglish/core";
-import type { NormalizedRecord } from "../../stages/03_normalize";
+import type { NormalizedRecord } from "../../stages/03_normalize_pre";
 import type { HurlebatteSourceRecord } from "./02_parse";
 import { OriginKind, OriginLanguage, WordnetPOS } from "@anglish/core";
 import OpenAI from "openai";

@@ -17,12 +17,13 @@
     "dist"
   ],
   "scripts": {
-    "etl": "pnpm run fetch && pnpm run parse && pnpm run normalize && pnpm run merge && pnpm run map",
+    "etl": "pnpm run fetch && pnpm run parse && pnpm run normalize-pre && pnpm run merge && pnpm run normalize-post && pnpm run map",
     "fetch": "tsx src/cli.ts fetch",
     "fetch:force": "tsx src/cli.ts fetch --force",
     "parse": "tsx src/cli.ts parse",
-    "normalize": "tsx src/cli.ts normalize",
+    "normalize-pre": "tsx src/cli.ts normalize-pre",
     "merge": "tsx src/cli.ts merge",
+    "normalize-post": "tsx src/cli.ts normalize-post",
     "map": "tsx src/cli.ts map",
     "wordnet:fetch": "dotenv -e ../../.env -- tsx src/wordnet/cli.ts fetch",
     "wordnet:embed": "dotenv -e ../../.env -- tsx src/wordnet/cli.ts embed",

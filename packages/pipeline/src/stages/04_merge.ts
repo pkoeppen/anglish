@@ -1,14 +1,11 @@
 import type { WordnetPOS, WordOrigin } from "@anglish/core";
 import type { WordnetPOSEntry } from "../types";
-import type { NormalizedRecord } from "./03_normalize";
+import type { NormalizedRecord } from "./03_normalize_pre";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import OpenAI from "openai";
-import { readJsonl, wordRegex } from "../util";
+import { readJsonl } from "../util";
 import { loadWordnet } from "../wordnet/wordnet";
-
-const openai = new OpenAI();
 
 export interface MergeManifestRow {
   id: string;
@@ -59,12 +56,13 @@ export async function defaultMerge(records: NormalizedRecord[], mergedAt: string
   for (const record of records) {
     const wordnetPOSEntry: WordnetPOSEntry | undefined
       = entries[record.lemma]?.[record.pos as WordnetPOS];
+
     if (wordnetPOSEntry) {
       // Wordnet already has this word/pos combo
       continue;
     }
     if (record.glosses.length === 0) {
-      console.error(`No glosses for ${record.lemma}:${record.pos}`.red);
+      console.error(`No glosses for ${record.lemma}:${record.pos}`.yellow);
       continue;
     }
 
@@ -74,7 +72,7 @@ export async function defaultMerge(records: NormalizedRecord[], mergedAt: string
     groups.set(key, group);
   }
 
-  const merged: MergedRecord[] = [];
+  const merged: (Omit<MergedRecord, "glosses"> & { glosses: string[] })[] = [];
 
   for (const [key, group] of groups.entries()) {
     const [lemma, pos] = key.split(":", 2) as [string, WordnetPOS];
@@ -120,29 +118,6 @@ export async function defaultMerge(records: NormalizedRecord[], mergedAt: string
       sources: sources.sort(),
       meta,
     });
-  }
-
-  let multipleGlossRecordCount = 0;
-  let oneGlossRecordCount = 0;
-  const oneWordGloss = (glosses: string[]) => glosses.length === 1 && wordRegex.test(glosses[0]);
-  for (const record of merged) {
-    if (oneWordGloss(record.glosses)) {
-      oneGlossRecordCount++;
-    }
-    else {
-      multipleGlossRecordCount++;
-    }
-  }
-  console.log(`${oneGlossRecordCount} records with one gloss`.yellow);
-  console.log(`${multipleGlossRecordCount} records with multiple glosses`.yellow);
-
-  for (const record of merged) {
-    if (!oneWordGloss(record.glosses)) {
-      const deduplicatedGlosses = await gptDedupeGlosses(record.lemma, record.pos as WordnetPOS, record.glosses);
-      if (deduplicatedGlosses) {
-        record.glosses = deduplicatedGlosses;
-      }
-    }
   }
 
   return merged;
@@ -194,6 +169,9 @@ export async function runMergeStage(
   const mergeFn = merger ?? defaultMerge;
   const merged = await mergeFn(allRecords, mergedAt);
 
+  const skippedCount = allRecords.length - merged.length;
+  console.log(`Skipped ${skippedCount} records (already in Wordnet)`);
+
   const outputPath = path.join(outRecordsDir, "merged_records.jsonl");
   const w = fs.createWriteStream(outputPath, { flags: "w" });
 
@@ -222,69 +200,4 @@ export async function runMergeStage(
   await fsp.appendFile(outManifest, `${JSON.stringify(manifestRow)}\n`, "utf8");
 
   return results;
-}
-
-async function gptDedupeGlosses(word: string, pos: WordnetPOS, glosses: string[]): Promise<string[] | null> {
-  const systemMessage = `
-    You dedupe dictionary glosses for one lemma (Anglish word) and POS.  
-    Merge glosses only if they express the *same sense*.  
-    If meanings differ, keep both.  
-    Keep one short, clear gloss per distinct sense.  
-    You may lightly rephrase for clarity but must not introduce new senses.
-    Omit senses that do not make any sense.
-    Output JSON { "glosses": string[] } only.
-  `;
-  const prompt = glosses.map(gloss => `${word} (${pos}): ${gloss}`).join("\n");
-
-  const jsonSchema = {
-    type: "object",
-    properties: {
-      glosses: {
-        type: "array",
-        items: {
-          type: "string",
-        },
-      },
-    },
-    required: ["glosses"],
-    additionalProperties: false,
-  };
-
-  try {
-    const completion = await openai.chat.completions.create({
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: prompt },
-      ],
-      model: "gpt-4o",
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "deduplicated_glosses",
-          strict: true,
-          schema: jsonSchema,
-        },
-      },
-    });
-
-    const result = completion.choices[0]?.message?.content;
-    if (!result) {
-      return null;
-    }
-
-    const parsed = JSON.parse(result) as { glosses: string[] };
-
-    if (parsed.glosses.length !== glosses.length) {
-      console.log(`GPT: Deduplicated ${glosses.length} -> ${parsed.glosses.length} glosses for ${word}:${pos}`.blue);
-    }
-
-    console.log(parsed.glosses.join(", ").green);
-    console.log(glosses.join(", ").red);
-
-    return parsed.glosses;
-  }
-  catch (error) {
-    console.error(`Error extracting word origin data:`, error);
-    return null;
-  }
 }
