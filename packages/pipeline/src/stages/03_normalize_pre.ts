@@ -5,10 +5,7 @@ import type { KaikkiSourceRecord } from "../sources/kaikki/02_parse";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import OpenAI from "openai";
 import { makeLimiter, readJsonl } from "../util";
-
-const openai = new OpenAI();
 
 export interface NormalizeManifestRow {
   id: string;
@@ -145,76 +142,4 @@ export async function runNormalizeStagePre(
   }
 
   return results;
-}
-
-async function gptDedupeGlosses(word: string, pos: WordnetPOS, glosses: string[]): Promise<string[] | null> {
-  const systemMessage = `
-    You dedupe dictionary glosses for one lemma (Anglish word) and POS.  
-    Merge glosses only if they express the *same sense*.  
-    If meanings differ, keep both.  
-    Keep one short, clear gloss per distinct sense.  
-    You may format and rephrase for clarity but must not introduce new senses.
-    Omit senses that do not make any sense.
-    Rephrase single-word glosses to make them more descriptive.
-  `;
-  const prompt = glosses.map(gloss => `${word} (${pos}): ${gloss}`).join("\n");
-
-  const jsonSchema = {
-    type: "object",
-    properties: {
-      glosses: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            text: {
-              type: "string",
-            },
-            category: {
-              type: "string",
-            },
-          },
-          required: ["text", "category"],
-          additionalProperties: false,
-        },
-      },
-    },
-    required: ["glosses"],
-    additionalProperties: false,
-  };
-
-  try {
-    const completion = await openai.chat.completions.create({
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: prompt },
-      ],
-      model: "gpt-4o",
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "deduplicated_glosses",
-          strict: true,
-          schema: jsonSchema,
-        },
-      },
-    });
-
-    const result = completion.choices[0]?.message?.content;
-    if (!result) {
-      return null;
-    }
-
-    const parsed = JSON.parse(result) as { glosses: string[] };
-
-    if (parsed.glosses.length !== glosses.length) {
-      console.log(`GPT: Deduplicated ${glosses.length} -> ${parsed.glosses.length} glosses for ${word}:${pos}`.blue);
-    }
-
-    return parsed.glosses;
-  }
-  catch (error) {
-    console.error(`Error extracting word origin data:`, error);
-    return null;
-  }
 }

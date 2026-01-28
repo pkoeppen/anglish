@@ -20,26 +20,26 @@ export async function* readJsonl<T>(filePath: string): AsyncGenerator<T> {
 }
 
 export function makeLimiter(
-  concurrency: number,
-  ratePerSecond?: number,
+  concurrency?: number,
+  ratePerMinute?: number,
 ) {
   let active = 0;
   const queue: Array<() => void> = [];
   const startTimes: number[] = [];
 
   const canStart = (): boolean => {
-    if (active >= concurrency)
+    if (concurrency !== undefined && active >= concurrency)
       return false;
-    if (ratePerSecond === undefined)
+    if (ratePerMinute === undefined)
       return true;
 
     const now = Date.now();
-    const oneSecondAgo = now - 1000;
-    // Remove start times older than 1 second
-    while (startTimes.length > 0 && startTimes[0] < oneSecondAgo) {
+    const oneMinuteAgo = now - 60000;
+    // Remove start times older than 1 minute
+    while (startTimes.length > 0 && startTimes[0] < oneMinuteAgo) {
       startTimes.shift();
     }
-    return startTimes.length < ratePerSecond;
+    return startTimes.length < ratePerMinute;
   };
 
   const tryNext = () => {
@@ -50,18 +50,18 @@ export function makeLimiter(
       const fn = queue.shift();
       if (fn) {
         active++;
-        if (ratePerSecond !== undefined) {
+        if (ratePerMinute !== undefined) {
           startTimes.push(Date.now());
         }
         fn();
       }
     }
-    else if (ratePerSecond !== undefined && active < concurrency) {
+    else if (ratePerMinute !== undefined && (concurrency === undefined || active < concurrency)) {
       // We have concurrency available but are rate limited
       // Schedule a retry after the oldest operation becomes eligible
       const oldestStart = startTimes[0];
       if (oldestStart !== undefined) {
-        const waitTime = 1000 - (Date.now() - oldestStart) + 1;
+        const waitTime = 60000 - (Date.now() - oldestStart) + 1;
         if (waitTime > 0) {
           setTimeout(tryNext, waitTime);
         }
@@ -82,7 +82,7 @@ export function makeLimiter(
 
       if (canStart()) {
         active++;
-        if (ratePerSecond !== undefined) {
+        if (ratePerMinute !== undefined) {
           startTimes.push(Date.now());
         }
         run();

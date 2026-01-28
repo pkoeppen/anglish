@@ -47,7 +47,7 @@ export async function createSynsetEmbeddings() {
   const synsets = loadSynsetsWithCategory();
 
   const concurrency = 30;
-  const run = makeLimiter(concurrency, 4500 / 60);
+  const run = makeLimiter(concurrency, 4500);
 
   console.log(`Creating embeddings for ${Object.keys(synsets).length} synsets`);
 

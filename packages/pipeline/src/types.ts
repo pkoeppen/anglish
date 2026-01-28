@@ -12,27 +12,27 @@ export type WordnetEntry = {
 };
 
 export type SenseRelation
-  = | "exemplifies"
-    | "pertainym"
-    | "derivation"
-    | "event"
-    | "antonym"
-    | "state"
-    | "agent"
-    | "result"
-    | "body_part"
-    | "undergoer"
+  = | "agent"
     | "also"
-    | "property"
-    | "location"
+    | "antonym"
+    | "body_part"
     | "by_means_of"
-    | "instrument"
-    | "uses"
-    | "material"
-    | "vehicle"
-    | "participle"
+    | "derivation"
     | "destination"
-    | "similar";
+    | "event"
+    | "exemplifies"
+    | "instrument"
+    | "location"
+    | "material"
+    | "participle"
+    | "pertainym"
+    | "property"
+    | "result"
+    | "similar"
+    | "state"
+    | "undergoer"
+    | "uses"
+    | "vehicle";
 
 export type WordnetSense = {
   synset: string;
@@ -44,7 +44,19 @@ export type WordnetSense = {
   [key in SenseRelation]?: string[];
 };
 
-export type SynsetRelation = "exemplifies" | "similar" | "hypernym" | "attribute";
+export type SynsetRelation
+  = | "also"
+    | "attribute"
+    | "causes"
+    | "domain_region"
+    | "domain_topic"
+    | "entails"
+    | "exemplifies"
+    | "hypernym"
+    | "mero_member"
+    | "mero_part"
+    | "mero_substance"
+    | "similar";
 
 export type WordnetSynset = {
   definition: string[];
@@ -52,6 +64,8 @@ export type WordnetSynset = {
   members: string[];
   partOfSpeech: string;
   example?: (string | { source: string; text: string })[];
+  wikidata?: string | string[];
+  source?: string;
 } & {
   [key in SynsetRelation]?: string[];
 };

@@ -68,7 +68,7 @@ export async function runNormalizeStagePost(config: NormalizeStageConfig): Promi
   const w = fs.createWriteStream(outputPath, { flags: "w" });
   const normalizedAt = new Date().toISOString();
 
-  const run = makeLimiter(config.concurrency ?? 100, 1000 / 60);
+  const run = makeLimiter(config.concurrency ?? 100, 1000); // Limiter set according to o4 rate limits
   let recordsOut = 0;
 
   try {

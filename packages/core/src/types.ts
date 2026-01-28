@@ -1,3 +1,13 @@
+export enum Language {
+  English = "en",
+  Anglish = "an",
+}
+
+export enum Source {
+  Wordnet = "wordnet",
+  User = "user",
+}
+
 export enum WordnetPOS {
   Noun = "n",
   Verb = "v",
@@ -5,7 +15,6 @@ export enum WordnetPOS {
   Satellite = "s",
   Adverb = "r",
 }
-
 
 export enum OriginLanguage {
   PIE = "Proto-Indo-European",
@@ -72,6 +81,71 @@ export enum OriginLanguage {
   FN = "Finnish",
 }
 
+export enum OriginCode {
+  ProtoIndoEuropean = "PIE",
+  ProtoGermanic = "PG",
+  ProtoNorse = "PN",
+  OldNorse = "ON",
+  OldWestNorse = "OWN",
+  OldIcelandic = "OIC",
+  MiddleIcelandic = "MIC",
+  ModernIcelandic = "IC",
+  OldNorwegian = "ONO",
+  MiddleNorwegian = "MNO",
+  Norwegian = "NO",
+  OldFaroese = "OFO",
+  Faroese = "FO",
+  OldNorn = "ONN",
+  Norn = "NN",
+  OldEastNorse = "OEN",
+  EarlyOldDanish = "EOD",
+  LateOldDanish = "LOD",
+  Danish = "DN",
+  EarlyOldSwedish = "EOS",
+  LateOldSwedish = "LOS",
+  Swedish = "SW",
+  EarlyOldGutnish = "EOG",
+  LateOldGutnish = "LOG",
+  Gutnish = "GU",
+  Elfdalian = "ED",
+  ProtoWestGermanic = "PWG",
+  OldEnglish = "OE",
+  OldEnglishMercian = "OEM",
+  OldEnglishNorthumbrian = "OENU",
+  MiddleEnglish = "ME",
+  EarlyNewModernEnglish = "ENE",
+  NewModernEnglish = "NE",
+  EarlyScots = "ES",
+  MiddleScots = "MS",
+  NewScots = "NS",
+  OldFrisian = "OF",
+  MiddleFrisian = "MF",
+  NorthFrisian = "NF",
+  WestFrisian = "WF",
+  SaterlandFrisian = "SF",
+  OldSaxon = "OS",
+  MiddleLowSaxon = "MLS",
+  LowSaxon = "LS",
+  OldFrankish = "OFK",
+  OldLowFranconian = "OLF",
+  MiddleDutch = "MNL",
+  ModernDutch = "NL",
+  Afrikaans = "AF",
+  OldHighGerman = "OHG",
+  MiddleHighGerman = "MHG",
+  EarlyNewHighGerman = "ENHG",
+  NewHighGerman = "NHG",
+  Yiddish = "YD",
+  Lombardic = "LO",
+  ProtoEastGermanic = "PEG",
+  Gothic = "GO",
+  Vandalic = "VA",
+  Burgundian = "BU",
+  CrimeanGothic = "CG",
+  NewPersian = "NP",
+  Finnish = "FN",
+}
+
 export enum OriginKind {
   Inherited = "inherited",
   Derived = "derived",
@@ -85,4 +159,43 @@ export interface WordOrigin {
   lang: OriginLanguage,
   kind: OriginKind,
   form: string // The source word form. Ex: "bōtuz"
+}
+
+export enum SenseRelation {
+  Agent = "agent",
+  Also = "also",
+  Antonym = "antonym",
+  BodyPart = "body_part",
+  ByMeansOf = "by_means_of",
+  Derivation = "derivation",
+  Destination = "destination",
+  Event = "event",
+  Exemplifies = "exemplifies",
+  Instrument = "instrument",
+  Location = "location",
+  Material = "material",
+  Participle = "participle",
+  Pertainym = "pertainym",
+  Property = "property",
+  Result = "result",
+  Similar = "similar",
+  State = "state",
+  Undergoer = "undergoer",
+  Uses = "uses",
+  Vehicle = "vehicle",
+}
+
+export enum SynsetRelation {
+  Also = "also",
+  Attribute = "attribute",
+  Causes = "causes",
+  DomainRegion = "domain_region",
+  DomainTopic = "domain_topic",
+  Entails = "entails",
+  Exemplifies = "exemplifies",
+  Hypernym = "hypernym",
+  MeroMember = "mero_member",
+  MeroPart = "mero_part",
+  MeroSubstance = "mero_substance",
+  Similar = "similar",
 }

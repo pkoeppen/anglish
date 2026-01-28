@@ -1,5 +1,8 @@
-import path from "node:path";
-import process from "node:process";
+import path, { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-export const repoRoot = path.resolve(process.cwd(), "../..");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+export const repoRoot = path.resolve(__dirname, "../../..");
 export const dataRoot = path.join(repoRoot, "data/anglish");

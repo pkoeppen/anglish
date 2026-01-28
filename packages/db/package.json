@@ -1,35 +1,39 @@
 {
   "name": "@anglish/db",
-  "version": "0.1.0",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com/"
   },
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "version": "0.1.0",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "default": "./dist/constants.js"
     }
   },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
   "scripts": {
-    "db:reset": "tsx --tsconfig tsconfig.scripts.json scripts/reset.ts",
-    "db:bootstrap": "tsx --tsconfig tsconfig.scripts.json scripts/bootstrap.ts"
+    "db:migrate": "tsx --tsconfig tsconfig.scripts.json scripts/migrate.ts"
   },
   "dependencies": {
     "@anglish/core": "workspace:*",
     "kysely": "0.28.9",
+    "luxon": "^3.7.2",
     "pg": "8.16.3",
     "redis": "^5.10.0"
   },
   "devDependencies": {
     "@anglish/config": "workspace:*",
+    "@types/luxon": "^3.7.1",
     "@types/pg": "8.16.0",
-    "colors": "1.4.0",
-    "dependency-graph": "1.0.0"
+    "colors": "1.4.0"
   }
 }

@@ -1,14 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2022"],
-    "types": ["node"],
     "composite": true,
+    "lib": ["ES2022"],
     "rootDir": ".",
+    "types": ["node"],
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts"],
   "references": [
     { "path": "../core" }
-  ]
+  ],
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "migrations/**/*.ts"]
 }

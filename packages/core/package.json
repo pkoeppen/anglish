@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@anglish/config": "workspace:*",
+    "colors": "1.4.0",
     "winston": "^3.19.0"
   }
 }

@@ -1,16 +1,19 @@
 import type { KyselyConfig, LogEvent } from "kysely";
 import type { DB } from "./tables";
-import { logger } from "@anglish/core";
+import process from "node:process";
+import { assertEnv, logger } from "@anglish/core";
 import { Kysely, PostgresDialect } from "kysely";
 import pg from "pg";
-import { postgresConfig } from "./config";
+import { initParsers } from "./parsers";
 import "colors";
 
-const PG_COUNT_OID = 20;
-
-pg.types.setTypeParser(PG_COUNT_OID, str => BigInt(str));
-pg.types.setTypeParser(pg.types.builtins.NUMERIC, str => Number.parseFloat(str));
-pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, str => str);
+assertEnv([
+  "POSTGRES_HOST",
+  "POSTGRES_PORT",
+  "POSTGRES_USER",
+  "POSTGRES_PASSWORD",
+  "POSTGRES_DB",
+]);
 
 export class DatabaseClient {
   public readonly kysely: Kysely<DB>;
@@ -37,6 +40,8 @@ export class DatabaseClient {
       },
     };
 
+    initParsers();
+
     this.kysely = new Kysely<DB>(kyselyConfig);
   }
 
@@ -45,4 +50,10 @@ export class DatabaseClient {
   }
 }
 
-export const db = new DatabaseClient(postgresConfig);
+export const db = new DatabaseClient({
+  host: process.env.POSTGRES_HOST,
+  port: Number.parseInt(process.env.POSTGRES_PORT ?? "5432"),
+  user: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PASSWORD,
+  database: process.env.POSTGRES_DB,
+});

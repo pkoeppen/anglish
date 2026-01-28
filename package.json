@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "build": "tsc -b",
+    "db:migrate": "dotenv -- pnpm --filter @anglish/db run db:migrate",
     "etl": "dotenv -- pnpm --filter @anglish/pipeline run etl",
     "etl:fetch": "dotenv -- pnpm --filter @anglish/pipeline run fetch",
     "etl:parse": "dotenv -- pnpm --filter @anglish/pipeline run parse",

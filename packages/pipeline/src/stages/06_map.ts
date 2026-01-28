@@ -1,9 +1,11 @@
+import type { NewLemma, NewSense } from "@anglish/db";
 import type { VectorSearchResult } from "../wordnet/embedding";
 import type { PostNormalizedRecord } from "./05_normalize_post";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import { WordnetPOS } from "@anglish/core";
+import { Language, WordnetPOS } from "@anglish/core";
+import { db } from "@anglish/db";
 import { makeLimiter, readJsonl } from "../util";
 import { vectorSearch } from "../wordnet/embedding";
 
@@ -33,43 +35,29 @@ export async function runMapStage(config: MapStageConfig): Promise<void> {
 
   console.log(`Reading normalized post records from ${inputPath}`);
 
-  const run = makeLimiter(1000, 5000 / 60);
+  const run = makeLimiter(100, 5000);
   const promises = [];
 
   for await (const record of readJsonl<PostNormalizedRecord>(inputPath)) {
     promises.push(run(async () => {
-      for (const gloss of record.glosses) {
-        await mapGloss(gloss, record);
+      const newLemma: NewLemma = {
+        lemma: record.lemma,
+        pos: record.pos,
+        lang: Language.Anglish,
+      };
+      const lemma = await db.kysely.insertInto("lemma").values(newLemma).returning(["id"]).executeTakeFirstOrThrow();
+      for (let i = 0; i < record.glosses.length; i++) {
+        const gloss = record.glosses[i];
+        const closestSynset = await mapGloss(gloss, record);
+        continue;
+        const newSense: NewSense = {
+          lemma_id: lemma.id,
+          synset_id: closestSynset.id,
+          sense_index: i,
+        };
+        console.log(`Inserting sense ${record.lemma} (${record.pos}) -> ${closestSynset.headword}`);
+        await db.kysely.insertInto("sense").values(newSense).returning(["id"]).executeTakeFirstOrThrow();
       }
-      /*
-
-      create table lemma (
-        id          bigserial primary key,
-        lemma       text not null,             -- "light"
-        pos         text not null,             -- 'n', 'v', 'a', 'r' or enum
-        language    text not null default 'en' -- or 'an'
-        -- plus maybe: spelling_variant_group, etc.
-      );
-
-      create table sense (
-        id          bigserial primary key,
-        lemma_id    bigint not null references lemma(id),
-        sense_index smallint not null,         -- 1,2,3 ... for ordering per lemma
-        definition  text,                      -- the gloss
-        examples    text[],                    -- optional
-        category    text,                      -- noun.people, adj.pert, etc
-        synset_id   bigint null,
-        origins     jsonb[]
-      );
-
-      create table synset (
-        id         bigserial primary key,      -- Wordnet ids e.g. 12345678
-        pos        text not null,
-        gloss      text not null,
-        source     text,                       -- 'wordnet', 'user'...
-      );
-
-      */
     }));
   }
 
@@ -104,5 +92,7 @@ async function mapGloss(gloss: PostNormalizedRecord["glosses"][number], record: 
   console.log(`${record.lemma} (${record.pos}): ${gloss.text}`.green);
   console.log(results.map(r => `  ${r.headword.padEnd(20, " ")}${`(score: ${r.score.toFixed(3)})`.yellow}\t${r.categoryMatch ? "+".green : ""}`).join("\n"));
 
-  // Finally! Write to database!
+  const bestResult = results[0];
+
+  return bestResult;
 }
