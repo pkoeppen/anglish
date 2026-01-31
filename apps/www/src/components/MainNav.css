@@ -1,0 +1,9 @@
+@reference "../styles/global.css";
+
+.main-nav {
+  @apply h-nav bg-gray-700 text-white w-full flex items-center justify-center gap-4 font-serif p-2;
+}
+
+.main-nav-item {
+  @apply cursor-pointer rounded-lg bg-gray-500 aspect-square h-full flex items-center justify-center;
+}

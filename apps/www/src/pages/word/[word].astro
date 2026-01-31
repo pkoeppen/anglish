@@ -1,0 +1,86 @@
+---
+import { db } from "@anglish/db";
+import { sql } from "kysely";
+import Layout from "~/layouts/Layout.astro";
+import { readablePos } from "~/lib/util";
+
+export async function getStaticPaths() {
+  const lemmas = await db.kysely
+    .selectFrom("lemma")
+    .select([
+      sql<string>`DISTINCT lemma.lemma`.as("lemma"),
+    ])
+    .execute();
+
+  return lemmas.map(lemma => ({ params: { word: lemma.lemma.replace(/ /g, "_") } }));
+}
+
+const word = Astro.params.word.replace(/_/g, " ");
+
+const sensesByPos = await db.kysely
+  .selectFrom("lemma")
+  .innerJoin("sense", "lemma.id", "sense.lemma_id")
+  .innerJoin("synset", "sense.synset_id", "synset.id")
+  .select([
+    "lemma.pos",
+    sql.raw<{ index: number; gloss: string }[]>(`JSON_AGG(JSON_BUILD_OBJECT('index', sense.sense_index, 'gloss', synset.gloss))`).as("senses"),
+  ])
+  .where("lemma.lemma", "=", word)
+  .groupBy("lemma.pos")
+  .execute();
+
+sensesByPos.forEach((s) => {
+  s.senses.sort((a, b) => a.index - b.index);
+});
+
+  console.log(JSON.stringify(sensesByPos, null, 2));
+---
+
+<Layout>
+  <main class="min-h-[calc(100vh-var(--spacing-nav))] flex flex-col items-center py-12">
+    <div class="font-display text-7xl">{word}</div>
+
+    <div class="mt-4 w-full max-w-3xl">
+      {sensesByPos.map(({ pos, senses }) => (
+        <section class="mb-8">
+          <h2 class="text-2xl font-semibold text-gray-800">{readablePos(pos)}</h2>
+          <div class="mt-4 space-y-3">
+            {senses.map(({ gloss }, i) => (
+              <div class="flex items-start">
+                <div class="pr-2 pt-px font-bold">{i + 1}.</div>
+                <div class="">
+                  <div class="text-lg leading-snug text-gray-700">{gloss}</div>
+                  {/* <div class="flex flex-wrap gap-x-1.5 pt-1 text-lg italic">
+                    {synonyms[synset.id]?.anglish_synonyms.map((synonym, i) => (
+                      <Link
+                        key={synonym.word}
+                        href={`/word/${synonym.word}`}
+                        class="text-orange-600"
+                      >
+                        {synonym.word}
+                        {i < synonyms[synset.id]?.anglish_synonyms.length - 1
+                          || synonyms[synset.id]?.english_synonyms.length > 0
+                          ? ", "
+                          : ""}
+                      </Link>
+                    ))}
+                    {synonyms[synset.id]?.english_synonyms.map((synonym, i) => (
+                      <Link
+                        key={synonym.word}
+                        href={`/word/${synonym.word}`}
+                        class="text-blue-700"
+                      >
+                        {synonym.word}
+                        {i < synonyms[synset.id]?.english_synonyms.length - 1 && ", "}
+                      </Link>
+                    ))}
+                  </div> */}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  </main>
+</Layout>
