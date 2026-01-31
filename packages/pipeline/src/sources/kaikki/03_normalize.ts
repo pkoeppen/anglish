@@ -36,7 +36,7 @@ export async function normalize(
   return records;
 }
 
-function normalizeKaikkiPOS(pos: KaikkiSourceRecord["pos"]) {
+export function normalizeKaikkiPOS(pos: KaikkiSourceRecord["pos"]) {
   switch (pos.toLowerCase()) {
     case "noun":
       return WordnetPOS.Noun;

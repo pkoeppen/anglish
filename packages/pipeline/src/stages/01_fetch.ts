@@ -5,7 +5,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import * as cheerio from "cheerio";
-import { makeLimiter } from "../util";
+import { makeLimiter } from "../lib/util";
 import "colors";
 
 export interface FetchMetadata {

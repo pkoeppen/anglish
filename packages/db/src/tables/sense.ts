@@ -1,12 +1,11 @@
 import type { Generated, Insertable, Selectable, Updateable } from "kysely";
-import type { Default } from "../shared";
 
 export interface SenseTable {
   id: Generated<number>;
   lemma_id: number;
   synset_id: string;
-  sense_index: number;
-  examples: Default<string[]>;
+  sense_index: Generated<number>;
+  examples: Generated<string[]>;
 }
 
 export type Sense = Selectable<SenseTable>;

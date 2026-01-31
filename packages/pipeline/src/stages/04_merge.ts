@@ -4,8 +4,8 @@ import type { NormalizedRecord } from "./03_normalize_pre";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import { readJsonl } from "../util";
-import { loadWordnet } from "../wordnet/wordnet";
+import { readJsonl } from "../lib/util";
+import { loadWordnetEntries } from "../lib/wordnet";
 
 export interface MergeManifestRow {
   id: string;
@@ -49,7 +49,7 @@ export async function defaultMerge(records: NormalizedRecord[], mergedAt: string
   if (records.length === 0)
     return [];
 
-  const { entries } = loadWordnet();
+  const entries = loadWordnetEntries();
 
   // Key by lemma+pos
   const groups = new Map<string, NormalizedRecord[]>();
@@ -127,8 +127,8 @@ export async function runMergeStage(
   config: MergeStageConfig,
   merger?: Merger,
 ): Promise<MergeManifestRow[]> {
-  const inDir = path.join(config.dataRoot, "03_normalize", "out");
-  const outDir = path.join(config.dataRoot, "04_merge");
+  const inDir = path.join(config.dataRoot, "anglish", "03_normalize", "out");
+  const outDir = path.join(config.dataRoot, "anglish", "04_merge");
   const outRecordsDir = path.join(outDir, "out");
   const outManifest = path.join(outDir, "manifest.04_merge.jsonl");
 

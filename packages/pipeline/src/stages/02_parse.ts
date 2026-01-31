@@ -5,7 +5,7 @@ import type { FetchManifestRow, JobMetadata } from "./01_fetch";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { readJsonl } from "../util";
+import { readJsonl } from "../lib/util";
 
 export interface ParseManifestRow {
   id: string;
@@ -39,10 +39,10 @@ export async function runParseStage(
   parsers: Record<string, SourceParser>,
   config: ParseStageConfig,
 ): Promise<ParseManifestRow[]> {
-  const inDir = path.join(config.dataRoot, "01_fetch");
+  const inDir = path.join(config.dataRoot, "anglish", "01_fetch");
   const inManifest = path.join(inDir, "manifest.01_fetch.jsonl");
 
-  const outDir = path.join(config.dataRoot, "02_parse");
+  const outDir = path.join(config.dataRoot, "anglish", "02_parse");
   const outRecordsDir = path.join(outDir, "out");
   const outRejectsDir = path.join(outDir, "rejects");
   const outManifest = path.join(outDir, "manifest.02_parse.jsonl");

@@ -3,7 +3,7 @@ import type { NormalizedRecord } from "../../stages/03_normalize_pre";
 import type { AnglishMootSourceRecord } from "./02_parse";
 import { OriginKind, OriginLanguage, WordnetPOS } from "@anglish/core";
 import OpenAI from "openai";
-import { wordPattern, wordRegex } from "../../util";
+import { wordPattern, wordRegex } from "../../lib/util";
 import { AnglishMootAbbreviation } from "./abbreviations";
 import "colors";
 

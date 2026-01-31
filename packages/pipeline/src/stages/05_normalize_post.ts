@@ -6,8 +6,8 @@ import * as fsp from "node:fs/promises";
 import * as path from "node:path";
 import { WordnetPOS } from "@anglish/core";
 import OpenAI from "openai";
-import { makeLimiter, readJsonl, wordnetReadablePOS } from "../util";
-import { getCategoriesByPOS } from "../wordnet/categories";
+import { makeLimiter, readJsonl, wordnetReadablePOS } from "../lib/util";
+import { getCategoriesByPOS } from "../lib/wordnet";
 
 const openai = new OpenAI();
 
@@ -35,8 +35,8 @@ export interface PostNormalizedRecord {
 }
 
 export async function runNormalizeStagePost(config: NormalizeStageConfig): Promise<NormalizePostManifestRow[]> {
-  const inDir = path.join(config.dataRoot, "04_merge", "out");
-  const outDir = path.join(config.dataRoot, "05_normalize_post");
+  const inDir = path.join(config.dataRoot, "anglish", "04_merge", "out");
+  const outDir = path.join(config.dataRoot, "anglish", "05_normalize_post");
   const outRecordsDir = path.join(outDir, "out");
   const outManifest = path.join(outDir, "manifest.05_normalize_post.jsonl");
 
@@ -217,7 +217,7 @@ async function gptDedupeGlosses(word: string, pos: WordnetPOS, glosses: string[]
   }
 }
 
-async function gptCategorizeGloss(gloss: string, pos: WordnetPOS, possibleCategories: string[]): Promise<string | null> {
+export async function gptCategorizeGloss(gloss: string, pos: WordnetPOS, possibleCategories: string[]): Promise<string | null> {
   const systemMessage = `
     You assign a dictionary gloss to a single WordNet filename category.
     

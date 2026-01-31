@@ -1,4 +1,3 @@
-import type { SynsetVec } from "./wordnet/embedding";
 import * as fs from "node:fs";
 import * as readline from "node:readline";
 import { WordnetPOS } from "@anglish/core";
@@ -109,35 +108,6 @@ export async function retry<T>(fn: () => Promise<T>, retries = 3, delay = 1000):
     }
     throw error;
   }
-}
-
-export function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0;
-  let na = 0;
-  let nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    const x = a[i];
-    const y = b[i];
-    dot += x * y;
-    na += x * x;
-    nb += y * y;
-  }
-  return dot / (Math.sqrt(na) * Math.sqrt(nb));
-}
-
-export function searchNearest(
-  queryEmbedding: number[],
-  candidates: SynsetVec[],
-  k = 5,
-) {
-  const scored = candidates.map(c => ({
-    id: c.id,
-    headword: c.headword,
-    score: cosineSimilarity(queryEmbedding, c.embedding),
-  }));
-
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, k);
 }
 
 export function wordnetReadablePOS(pos: WordnetPOS): string {

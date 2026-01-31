@@ -68,7 +68,7 @@ function stableRawId(data: Record<string, unknown>): string {
   return h.digest("hex").slice(0, 20);
 }
 
-function isAnglish(kaikkiEntry: KaikkiEntry) {
+export function isAnglish(kaikkiEntry: KaikkiEntry) {
   const etymTemplates = kaikkiEntry.etymology_templates;
   let hasGermanic = false;
   let hasLatin = false;

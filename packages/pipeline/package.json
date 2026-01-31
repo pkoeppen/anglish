@@ -24,11 +24,7 @@
     "normalize-pre": "tsx src/cli.ts normalize-pre",
     "merge": "tsx src/cli.ts merge",
     "normalize-post": "tsx src/cli.ts normalize-post",
-    "map": "tsx src/cli.ts map",
-    "wordnet:fetch": "dotenv -e ../../.env -- tsx src/wordnet/cli.ts fetch",
-    "wordnet:embed": "dotenv -e ../../.env -- tsx src/wordnet/cli.ts embed",
-    "wordnet:load": "dotenv -e ../../.env -- tsx src/wordnet/cli.ts load",
-    "wordnet:index": "dotenv -e ../../.env -- tsx src/wordnet/cli.ts index"
+    "map": "tsx src/cli.ts map"
   },
   "devDependencies": {
     "@anglish/config": "workspace:*",
@@ -40,7 +36,11 @@
     "openai": "5.23.2",
     "pg": "8.16.3",
     "redis": "^5.10.0",
+    "tsx": "^4.21.0",
     "turndown": "^7.2.2",
     "yaml": "^2.8.2"
+  },
+  "dependencies": {
+    "kysely": "0.28.9"
   }
 }

@@ -1,7 +1,7 @@
 import antfu from "@antfu/eslint-config";
 
 export default antfu({
-  node: true,
+  astro: true,
   stylistic: {
     indent: 2,
     quotes: "double",

@@ -71,8 +71,9 @@ CREATE TABLE sense (
   id SERIAL PRIMARY KEY,
   lemma_id INT NOT NULL REFERENCES lemma(id),
   synset_id VARCHAR(14) REFERENCES synset(id),
-  sense_index SMALLINT NOT NULL,
-  examples TEXT [] NOT NULL DEFAULT '{}'::TEXT []
+  sense_index SMALLINT NOT NULL CHECK (sense_index >= 0),
+  examples TEXT [] NOT NULL DEFAULT '{}'::TEXT [],
+  CONSTRAINT lemma_sense_index_unique UNIQUE (lemma_id, sense_index)
 );
 CREATE INDEX index__sense__lemma_id ON sense(lemma_id);
 CREATE INDEX index__sense__synset_id ON sense(synset_id);
@@ -102,12 +103,25 @@ CREATE TABLE synset_synset (
 );
 CREATE INDEX index__synset_synset__synset_id_b ON synset_synset(synset_id_b);
 CREATE INDEX index__synset_synset__relation ON synset_synset(relation);
-/* Sense-Origin */
-CREATE TABLE sense_origin (
-  sense_id INT NOT NULL REFERENCES sense(id),
+/* Lemma-Origin */
+CREATE TABLE lemma_origin (
+  lemma_id INT NOT NULL REFERENCES lemma(id),
   origin_code VARCHAR(4) NOT NULL REFERENCES origin(code),
   kind origin_kind_enum NOT NULL,
-  PRIMARY KEY (sense_id, origin_code)
+  PRIMARY KEY (lemma_id, origin_code)
 );
-CREATE INDEX index__sense_origin__sense_id ON sense_origin(sense_id);
-CREATE INDEX index__sense_origin__origin_code ON sense_origin(origin_code);
+CREATE INDEX index__lemma_origin__lemma_id ON lemma_origin(lemma_id);
+CREATE INDEX index__lemma_origin__origin_code ON lemma_origin(origin_code);
+/*
+ * Auto-increment sense index
+ */
+CREATE OR REPLACE FUNCTION set_sense_index() RETURNS trigger AS $$ BEGIN IF NEW.sense_index IS NULL THEN
+SELECT COALESCE(MAX(sense_index), -1) + 1 INTO NEW.sense_index
+FROM sense
+WHERE lemma_id = NEW.lemma_id;
+END IF;
+RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER sense_set_index BEFORE
+INSERT ON sense FOR EACH ROW EXECUTE FUNCTION set_sense_index();

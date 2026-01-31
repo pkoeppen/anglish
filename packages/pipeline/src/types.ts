@@ -74,3 +74,11 @@ export interface WordnetFrame {
   id: string;
   template: string;
 }
+
+export interface SynsetEmbeddingJSON {
+  id: string;
+  pos: WordnetPOS;
+  category: string;
+  headword: string;
+  embedding: number[];
+}

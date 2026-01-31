@@ -1,13 +1,15 @@
 import type { NewLemma, NewSense } from "@anglish/db";
-import type { VectorSearchResult } from "../wordnet/embedding";
+import type { SynsetEmbeddingJSON } from "../types";
 import type { PostNormalizedRecord } from "./05_normalize_post";
+import { Buffer } from "node:buffer";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
 import { Language, WordnetPOS } from "@anglish/core";
-import { db } from "@anglish/db";
-import { makeLimiter, readJsonl } from "../util";
-import { vectorSearch } from "../wordnet/embedding";
+import { db, redis } from "@anglish/db";
+import { REDIS_VSS_FLAT_INDEX } from "../constants";
+import { createEmbedding } from "../lib/gpt";
+import { makeLimiter, readJsonl } from "../lib/util";
 
 export interface MapStageConfig {
   dataRoot: string;
@@ -16,8 +18,8 @@ export interface MapStageConfig {
 }
 
 export async function runMapStage(config: MapStageConfig): Promise<void> {
-  const inDir = path.join(config.dataRoot, "05_normalize_post", "out");
-  const outDir = path.join(config.dataRoot, "05_map");
+  const inDir = path.join(config.dataRoot, "anglish", "05_normalize_post", "out");
+  const outDir = path.join(config.dataRoot, "anglish", "05_map");
   const inputPath = path.join(inDir, "normalized_post_records.jsonl");
 
   await fsp.mkdir(outDir, { recursive: true });
@@ -48,12 +50,10 @@ export async function runMapStage(config: MapStageConfig): Promise<void> {
       const lemma = await db.kysely.insertInto("lemma").values(newLemma).returning(["id"]).executeTakeFirstOrThrow();
       for (let i = 0; i < record.glosses.length; i++) {
         const gloss = record.glosses[i];
-        const closestSynset = await mapGloss(gloss, record);
-        continue;
+        const closestSynset = await mapGloss(gloss, record.lemma, record.pos);
         const newSense: NewSense = {
           lemma_id: lemma.id,
           synset_id: closestSynset.id,
-          sense_index: i,
         };
         console.log(`Inserting sense ${record.lemma} (${record.pos}) -> ${closestSynset.headword}`);
         await db.kysely.insertInto("sense").values(newSense).returning(["id"]).executeTakeFirstOrThrow();
@@ -64,8 +64,8 @@ export async function runMapStage(config: MapStageConfig): Promise<void> {
   await Promise.all(promises);
 }
 
-async function mapGloss(gloss: PostNormalizedRecord["glosses"][number], record: PostNormalizedRecord) {
-  const results = await vectorSearch(gloss.text, record.pos) as (VectorSearchResult & { categoryMatch: boolean })[];
+export async function mapGloss(gloss: PostNormalizedRecord["glosses"][number], lemma: string, pos: WordnetPOS) {
+  const results = await vectorSearchJSON(gloss.text, pos) as (VectorSearchResult & { categoryMatch: boolean })[];
 
   const scores = results.map(r => r.score);
   const min = Math.min(...scores);
@@ -89,10 +89,52 @@ async function mapGloss(gloss: PostNormalizedRecord["glosses"][number], record: 
 
   results.sort((a, b) => a.score - b.score);
 
-  console.log(`${record.lemma} (${record.pos}): ${gloss.text}`.green);
-  console.log(results.map(r => `  ${r.headword.padEnd(20, " ")}${`(score: ${r.score.toFixed(3)})`.yellow}\t${r.categoryMatch ? "+".green : ""}`).join("\n"));
+  // console.log(`${lemma} (${pos}): ${gloss.text}`.green);
+  // console.log(results.map(r => `  ${r.headword.padEnd(20, " ")}${`(score: ${r.score.toFixed(3)})`.yellow}\t${r.categoryMatch ? "+".green : ""}`).join("\n"));
 
   const bestResult = results[0];
 
   return bestResult;
+}
+
+interface VectorSearchResult {
+  id: string;
+  pos: WordnetPOS;
+  category: string;
+  headword: string;
+  score: number;
+}
+
+async function vectorSearchJSON(text: string, pos: WordnetPOS, k = 20): Promise<VectorSearchResult[]> {
+  const embedding = await createEmbedding(text);
+
+  const query = `@pos:{${pos}} =>[KNN ${k} @vector $query_vector AS score]`;
+  const float32 = new Float32Array(embedding);
+  const bytes = Buffer.from(float32.buffer);
+
+  const results = await redis.ft.search(REDIS_VSS_FLAT_INDEX, query, {
+    SORTBY: "score",
+    RETURN: ["score", "pos"],
+    DIALECT: 2,
+    PARAMS: {
+      query_vector: bytes,
+    },
+    LIMIT: {
+      from: 0,
+      size: k,
+    },
+  });
+
+  const synsets = await Promise.all(results.documents.map(async ({ id, value: { score } }) => {
+    const synset = await redis.json.get(id) as unknown as SynsetEmbeddingJSON;
+    return {
+      id: synset.id,
+      pos: synset.pos,
+      category: synset.category,
+      headword: synset.headword,
+      score: Number(score),
+    };
+  }));
+
+  return synsets;
 }

@@ -1,6 +1,7 @@
 import path from "node:path";
 import process from "node:process";
 import { dataRoot, repoRoot } from "./constants";
+import { verifySynsetEmbeddings, verifyWordnet } from "./lib/wordnet";
 import {
   fetchPlan as anglishMootFetchPlan,
   normalize as normalizeAnglishMoot,
@@ -22,7 +23,6 @@ import { runNormalizeStagePre } from "./stages/03_normalize_pre";
 import { runMergeStage } from "./stages/04_merge";
 import { runNormalizeStagePost } from "./stages/05_normalize_post";
 import { runMapStage } from "./stages/06_map";
-import { verifySynsetEmbeddings, verifyWordnet } from "./wordnet/wordnet";
 
 type Cmd = "fetch" | "parse" | "normalize-pre" | "merge" | "normalize-post" | "map";
 
@@ -38,7 +38,7 @@ await verifySynsetEmbeddings();
 if (cmd === "fetch") {
   console.log("=== STAGE: FETCH ===");
 
-  const outDir = path.join(dataRoot, "01_fetch");
+  const outDir = path.join(dataRoot, "anglish", "01_fetch");
   await runFetchStage([hurlebatteFetchPlan(), await anglishMootFetchPlan(), kaikkiFetchPlan()], {
     outDir,
     concurrency: 8,

@@ -5,7 +5,7 @@ import type { KaikkiSourceRecord } from "../sources/kaikki/02_parse";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import { makeLimiter, readJsonl } from "../util";
+import { makeLimiter, readJsonl } from "../lib/util";
 
 export interface NormalizeManifestRow {
   id: string;
@@ -49,8 +49,8 @@ export async function runNormalizeStagePre(
   normalizers: Record<string, SourceNormalizer<any>>,
   config: NormalizeStageConfig,
 ): Promise<NormalizeManifestRow[]> {
-  const inDir = path.join(config.dataRoot, "02_parse", "out");
-  const outDir = path.join(config.dataRoot, "03_normalize");
+  const inDir = path.join(config.dataRoot, "anglish", "02_parse", "out");
+  const outDir = path.join(config.dataRoot, "anglish", "03_normalize");
   const outRecordsDir = path.join(outDir, "out");
   const outManifest = path.join(outDir, "manifest.03_normalize.jsonl");
 
