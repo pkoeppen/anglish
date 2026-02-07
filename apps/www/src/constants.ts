@@ -1,0 +1,1 @@
+export const LETTER_ENTRIES_PER_PAGE = 800;

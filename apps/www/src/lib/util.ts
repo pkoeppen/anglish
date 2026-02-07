@@ -15,3 +15,11 @@ export function readablePos(pos: WordnetPOS) {
       return "unknown";
   }
 }
+
+export function slugify(text: string) {
+  return text.toLowerCase().replace(/ /g, "_");
+}
+
+export function unslugify(text: string) {
+  return text.replace(/_/g, " ");
+}

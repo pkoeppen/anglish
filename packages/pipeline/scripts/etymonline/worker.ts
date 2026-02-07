@@ -2,7 +2,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { parentPort, workerData } from "node:worker_threads";
-import { WordnetPOS } from "@anglish/core";
+import { dedent, WordnetPOS } from "@anglish/core";
 import { db } from "@anglish/db";
 import * as cheerio from "cheerio";
 
@@ -151,18 +151,4 @@ async function rewriteOrigin2(origin: string) {
   console.log(completion.usage?.prompt_tokens, completion.usage?.completion_tokens);
 
   return completion.choices[0]?.message?.content;
-}
-
-function dedent(strings: TemplateStringsArray, ...values: unknown[]) {
-  const full = strings.reduce(
-    (acc, s, i) => acc + s + (values[i] ?? ""),
-    "",
-  );
-  const lines = full.split("\n");
-  const minIndent = Math.min(
-    ...lines
-      .filter(l => l.trim())
-      .map(l => l.match(/^ */)![0].length),
-  );
-  return lines.map(l => l.slice(minIndent)).join("\n").trim();
 }

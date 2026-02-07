@@ -1,8 +1,9 @@
 ---
-import { db } from "@anglish/db";
+import { Language, SenseRelation } from "@anglish/core";
+import { db, getWordByLemma } from "@anglish/db";
 import { sql } from "kysely";
 import Layout from "~/layouts/Layout.astro";
-import { readablePos } from "~/lib/util";
+import { readablePos, slugify, unslugify } from "~/lib/util";
 
 export async function getStaticPaths() {
   const lemmas = await db.kysely
@@ -12,70 +13,115 @@ export async function getStaticPaths() {
     ])
     .execute();
 
-  return lemmas.map(lemma => ({ params: { word: lemma.lemma.replace(/ /g, "_") } }));
+  return lemmas.map(lemma => ({ params: { word: slugify(lemma.lemma) } }));
 }
 
-const word = Astro.params.word.replace(/_/g, " ");
+const lemma = unslugify(Astro.params.word);
+const result = await getWordByLemma(lemma);
+const lang = result[0].lang;
 
-const sensesByPos = await db.kysely
-  .selectFrom("lemma")
-  .innerJoin("sense", "lemma.id", "sense.lemma_id")
-  .innerJoin("synset", "sense.synset_id", "synset.id")
-  .select([
-    "lemma.pos",
-    sql.raw<{ index: number; gloss: string }[]>(`JSON_AGG(JSON_BUILD_OBJECT('index', sense.sense_index, 'gloss', synset.gloss))`).as("senses"),
-  ])
-  .where("lemma.lemma", "=", word)
-  .groupBy("lemma.pos")
-  .execute();
-
-sensesByPos.forEach((s) => {
-  s.senses.sort((a, b) => a.index - b.index);
-});
-
-  console.log(JSON.stringify(sensesByPos, null, 2));
+function getSenseRelationText(relation: SenseRelation): string {
+  switch (relation) {
+    case SenseRelation.Agent:
+      return "Agent:";
+    case SenseRelation.Also:
+      return "See also:";
+    case SenseRelation.Antonym:
+      return "Antonym:";
+    case SenseRelation.BodyPart:
+      return "Body part:";
+    case SenseRelation.ByMeansOf:
+      return "By means of:";
+    case SenseRelation.Derivation:
+      return "Derived from:";
+    case SenseRelation.Destination:
+      return "Destination:";
+    case SenseRelation.Event:
+      return "Event:";
+    case SenseRelation.Exemplifies:
+      return "Exemplifies:";
+    case SenseRelation.Instrument:
+      return "Instrument:";
+    case SenseRelation.Location:
+      return "Location:";
+    case SenseRelation.Material:
+      return "Material:";
+    case SenseRelation.Participle:
+      return "Participle:";
+    case SenseRelation.Pertainym:
+      return "Pertainym:";
+    case SenseRelation.Property:
+      return "Property:";
+    case SenseRelation.Result:
+      return "Result:";
+    case SenseRelation.Similar:
+      return "Similar:";
+    case SenseRelation.State:
+      return "State:";
+    case SenseRelation.Undergoer:
+      return "Undergoer:";
+    case SenseRelation.Uses:
+      return "Uses:";
+    case SenseRelation.Vehicle:
+      return "Vehicle:";
+    default:
+      return "Relation:";
+  }
+}
 ---
 
 <Layout>
   <main class="min-h-[calc(100vh-var(--spacing-nav))] flex flex-col items-center py-12">
-    <div class="font-display text-7xl">{word}</div>
+    <div class:list={[
+      lang === Language.Anglish ? "font-display text-7xl" : "font-serif text-7xl",
+]}
+    >{lemma}</div>
 
     <div class="mt-4 w-full max-w-3xl">
-      {sensesByPos.map(({ pos, senses }) => (
+      {result.map(({ pos, senses }) => (
         <section class="mb-8">
           <h2 class="text-2xl font-semibold text-gray-800">{readablePos(pos)}</h2>
           <div class="mt-4 space-y-3">
-            {senses.map(({ gloss }, i) => (
+            {senses.map(({ gloss, synonyms_en, synonyms_an, relations }, i) => (
               <div class="flex items-start">
                 <div class="pr-2 pt-px font-bold">{i + 1}.</div>
                 <div class="">
                   <div class="text-lg leading-snug text-gray-700">{gloss}</div>
-                  {/* <div class="flex flex-wrap gap-x-1.5 pt-1 text-lg italic">
-                    {synonyms[synset.id]?.anglish_synonyms.map((synonym, i) => (
-                      <Link
-                        key={synonym.word}
-                        href={`/word/${synonym.word}`}
+                  <div class="flex flex-wrap gap-x-1.5 pt-1 text-lg italic">
+                    {synonyms_an.map(synonym => (
+                      <a
+                        href={`/word/${slugify(synonym.lemma)}`}
                         class="text-orange-600"
                       >
-                        {synonym.word}
-                        {i < synonyms[synset.id]?.anglish_synonyms.length - 1
-                          || synonyms[synset.id]?.english_synonyms.length > 0
-                          ? ", "
-                          : ""}
-                      </Link>
+                        {synonym.lemma}
+                      </a>
                     ))}
-                    {synonyms[synset.id]?.english_synonyms.map((synonym, i) => (
-                      <Link
-                        key={synonym.word}
-                        href={`/word/${synonym.word}`}
+                    {synonyms_en.map(synonym => (
+                      <a
+                        href={`/word/${slugify(synonym.lemma)}`}
                         class="text-blue-700"
                       >
-                        {synonym.word}
-                        {i < synonyms[synset.id]?.english_synonyms.length - 1 && ", "}
-                      </Link>
+                        {synonym.lemma}
+                      </a>
                     ))}
-                  </div> */}
-                </div>
+                  </div>
+                  <div class="flex flex-wrap gap-x-1.5 pt-1 text-lg italic"></div>
+                    {Object.entries(relations).map(([relation, items]) => (
+                      <div class="text-gray-500 flex gap-2 italic">
+                        <div>{getSenseRelationText(relation as SenseRelation)}</div>
+                        {items.map(item => (
+                          <a
+                            href={`/word/${slugify(item.lemma)}`}
+                            class:list={[
+                              item.lang === Language.Anglish ? "text-orange-600" : "text-blue-700",
+                            ]}
+                          >
+                            {item.lemma}
+                          </a>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
               </div>
             ))}
           </div>
