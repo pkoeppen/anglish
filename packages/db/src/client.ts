@@ -8,11 +8,7 @@ import { initParsers } from "./parsers";
 import "colors";
 
 assertEnv([
-  "POSTGRES_HOST",
-  "POSTGRES_PORT",
-  "POSTGRES_USER",
-  "POSTGRES_PASSWORD",
-  "POSTGRES_DB",
+  "POSTGRES_URL",
 ]);
 
 export class DatabaseClient {
@@ -51,9 +47,5 @@ export class DatabaseClient {
 }
 
 export const db = new DatabaseClient({
-  host: process.env.POSTGRES_HOST,
-  port: Number.parseInt(process.env.POSTGRES_PORT ?? "5432"),
-  user: process.env.POSTGRES_USER,
-  password: process.env.POSTGRES_PASSWORD,
-  database: process.env.POSTGRES_DB,
+  connectionString: process.env.POSTGRES_URL,
 });

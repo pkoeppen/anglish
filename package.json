@@ -7,14 +7,14 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "db:migrate": "dotenv -- pnpm --filter @anglish/db run db:migrate",
-    "etl": "dotenv -- pnpm --filter @anglish/pipeline run etl",
-    "etl:fetch": "dotenv -- pnpm --filter @anglish/pipeline run fetch",
-    "etl:parse": "dotenv -- pnpm --filter @anglish/pipeline run parse",
-    "etl:normalize-pre": "dotenv -- pnpm --filter @anglish/pipeline run normalize-pre",
-    "etl:merge": "dotenv -- pnpm --filter @anglish/pipeline run merge",
-    "etl:normalize-post": "dotenv -- pnpm --filter @anglish/pipeline run normalize-post",
-    "etl:map": "dotenv -- pnpm --filter @anglish/pipeline run map",
+    "db:migrate": "pnpm --filter @anglish/db run db:migrate",
+    "etl": "pnpm --filter @anglish/pipeline run etl",
+    "etl:fetch": "pnpm --filter @anglish/pipeline run fetch",
+    "etl:parse": "pnpm --filter @anglish/pipeline run parse",
+    "etl:normalize-pre": "pnpm --filter @anglish/pipeline run normalize-pre",
+    "etl:merge": "pnpm --filter @anglish/pipeline run merge",
+    "etl:normalize-post": "pnpm --filter @anglish/pipeline run normalize-post",
+    "etl:map": "pnpm --filter @anglish/pipeline run map",
     "etl:clean": "rm -rf data/anglish"
   },
   "devDependencies": {

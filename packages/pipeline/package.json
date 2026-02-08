@@ -26,6 +26,9 @@
     "normalize-post": "tsx src/cli.ts normalize-post",
     "map": "tsx src/cli.ts map"
   },
+  "dependencies": {
+    "kysely": "0.28.9"
+  },
   "devDependencies": {
     "@anglish/config": "workspace:*",
     "@anglish/core": "workspace:*",
@@ -39,8 +42,5 @@
     "tsx": "^4.21.0",
     "turndown": "^7.2.2",
     "yaml": "^2.8.2"
-  },
-  "dependencies": {
-    "kysely": "0.28.9"
   }
 }

@@ -1,24 +1,27 @@
 ---
 import { Language, SenseRelation } from "@anglish/core";
-import { db, getWordByLemma } from "@anglish/db";
-import { sql } from "kysely";
+import { db, getWordsByLemmaId } from "@anglish/db";
 import Layout from "~/layouts/Layout.astro";
-import { readablePos, slugify, unslugify } from "~/lib/util";
+import { readablePos, slugify } from "~/lib/util";
 
 export async function getStaticPaths() {
   const lemmas = await db.kysely
     .selectFrom("lemma")
     .select([
-      sql<string>`DISTINCT lemma.lemma`.as("lemma"),
+      "lemma.id",
+      "lemma.lemma",
     ])
+    .distinctOn("lemma.lemma")
+    .offset(20000)
+    .limit(100)
     .execute();
 
-  return lemmas.map(lemma => ({ params: { word: slugify(lemma.lemma) } }));
+    return lemmas.map(lemma => ({ params: { lemma: slugify(lemma.lemma) }, props: { lemmaId: lemma.id } }));
 }
 
-const lemma = unslugify(Astro.params.word);
-const result = await getWordByLemma(lemma);
-const lang = result[0].lang;
+const lemmaId = Astro.props.lemmaId;
+const words = await getWordsByLemmaId(lemmaId);
+const lang = words[0].lang;
 
 function getSenseRelationText(relation: SenseRelation): string {
   switch (relation) {
@@ -75,10 +78,10 @@ function getSenseRelationText(relation: SenseRelation): string {
     <div class:list={[
       lang === Language.Anglish ? "font-display text-7xl" : "font-serif text-7xl",
 ]}
-    >{lemma}</div>
+    >{words[0].lemma}</div>
 
     <div class="mt-4 w-full max-w-3xl">
-      {result.map(({ pos, senses }) => (
+      {words.map(({ pos, senses }) => (
         <section class="mb-8">
           <h2 class="text-2xl font-semibold text-gray-800">{readablePos(pos)}</h2>
           <div class="mt-4 space-y-3">

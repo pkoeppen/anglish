@@ -1,30 +1,39 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-# Export password for psql
-export PGPASSWORD="$POSTGRES_PASSWORD"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 
-echo "Resetting database: $POSTGRES_DB"
+set -o allexport
+source "$REPO_ROOT/.env"
+set +o allexport
 
-echo "Terminating existing connections..."
-psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres <<EOF
-SELECT pg_terminate_backend(pg_stat_activity.pid)
-FROM pg_stat_activity
-WHERE pg_stat_activity.datname = '$POSTGRES_DB' AND pid <> pg_backend_pid();
-EOF
+is_prod=false
+if [[ "${1:-}" == "--prod" ]]; then
+  is_prod=true
+fi
 
-echo "Dropping database..."
-psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres <<EOF
-DROP DATABASE IF EXISTS "$POSTGRES_DB";
-EOF
+if $is_prod; then
+  POSTGRES_URL="${POSTGRES_URL_PROD:?POSTGRES_URL_PROD is not set}"
+else
+  POSTGRES_URL="${POSTGRES_URL_LOCAL:?POSTGRES_URL_LOCAL is not set}"
+fi
 
-echo "Creating database..."
-psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres <<EOF
-CREATE DATABASE "$POSTGRES_DB";
-EOF
+export POSTGRES_URL
 
-# Run migrations
+if $is_prod; then
+  echo "Resetting Anglish database (production)"
+else
+  echo "Resetting Anglish database (local)"
+fi
+
+echo "Dropping schema..."
+psql -q -v ON_ERROR_STOP=1 "$POSTGRES_URL" <<SQL
+  SET client_min_messages TO WARNING;
+  DROP SCHEMA IF EXISTS public CASCADE;
+  CREATE SCHEMA public;
+SQL
+
 echo "Running migrations..."
-cd "$(dirname "$0")/.."
+cd "$REPO_ROOT"
 pnpm db:migrate

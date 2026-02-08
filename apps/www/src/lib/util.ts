@@ -17,9 +17,9 @@ export function readablePos(pos: WordnetPOS) {
 }
 
 export function slugify(text: string) {
-  return text.toLowerCase().replace(/ /g, "_");
+  return encodeURIComponent(text);
 }
 
 export function unslugify(text: string) {
-  return text.replace(/_/g, " ");
+  return decodeURIComponent(text);
 }

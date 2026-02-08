@@ -4,12 +4,11 @@ import { assertEnv } from "@anglish/core";
 import { createClient } from "redis";
 
 assertEnv([
-  "REDIS_HOST",
-  "REDIS_PORT",
+  "REDIS_URL",
 ]);
 
 export const redis: RedisClientType = createClient({
-  url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
+  url: process.env.REDIS_URL,
 });
 
 redis.on("error", error => console.error(`Redis: ${error}`));

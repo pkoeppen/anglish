@@ -4,7 +4,7 @@ import { sql } from "kysely";
 import { escapeLiteral } from "pg";
 import { db } from "../client";
 
-export interface WordByLemmaResult {
+export interface WordsByLemmaResult {
   lemma: string;
   pos: WordnetPOS;
   lang: Language;
@@ -24,8 +24,7 @@ export interface WordByLemmaResult {
   }[];
 }
 
-export async function getWordByLemma(lemma: string) {
-  const escapedLemma = escapeLiteral(lemma);
+export async function getWordsByLemmaId(lemmaId: number) {
   const queryString = dedent`
     WITH seed AS (
       SELECT
@@ -40,7 +39,7 @@ export async function getWordByLemma(lemma: string) {
       FROM lemma
       JOIN sense  ON sense.lemma_id = lemma.id
       JOIN synset ON synset.id = sense.synset_id
-      WHERE lemma.lemma ILIKE ${escapedLemma}
+      WHERE lemma.id = ${lemmaId}
     ),
     syn_en_rows AS (
       SELECT DISTINCT
@@ -51,7 +50,7 @@ export async function getWordByLemma(lemma: string) {
       JOIN sense s2 ON s2.synset_id = seed.synset_id
       JOIN lemma l2 ON l2.id = s2.lemma_id
       WHERE l2.lang = 'en'
-        AND l2.lemma NOT ILIKE ${escapedLemma}
+        AND l2.id != ${lemmaId}
     ),
     syn_en AS (
       SELECT
@@ -69,7 +68,7 @@ export async function getWordByLemma(lemma: string) {
       JOIN sense s2 ON s2.synset_id = seed.synset_id
       JOIN lemma l2 ON l2.id = s2.lemma_id
       WHERE l2.lang = 'an'
-        AND l2.lemma NOT ILIKE ${escapedLemma}
+        AND l2.id != ${lemmaId}
     ),
     syn_an AS (
       SELECT
@@ -89,9 +88,8 @@ export async function getWordByLemma(lemma: string) {
       JOIN sense_sense ss ON ss.sense_id_a = seed.sense_id
       JOIN sense s2 ON s2.id = ss.sense_id_b
       JOIN lemma l2 ON l2.id = s2.lemma_id
-      WHERE l2.lemma NOT ILIKE ${escapedLemma}
+      WHERE l2.id != ${lemmaId}
     ),
-    -- array per relation per seed sense
     sense_rel_arrays AS (
       SELECT
         seed_sense_id,
@@ -103,7 +101,6 @@ export async function getWordByLemma(lemma: string) {
       FROM sense_rel_rows
       GROUP BY seed_sense_id, relation
     ),
-    -- object: { derivation: [...], pertainym: [...], ... } per seed sense
     sense_rel AS (
       SELECT
         seed_sense_id,
@@ -142,9 +139,7 @@ export async function getWordByLemma(lemma: string) {
     FROM senses;
   `;
 
-  const result = await sql.raw<WordByLemmaResult>(queryString).execute(db.kysely);
-
-  console.log(JSON.stringify(result.rows, null, 2));
+  const result = await sql.raw<WordsByLemmaResult>(queryString).execute(db.kysely);
 
   return result.rows;
 }
