@@ -21,6 +21,7 @@
     "dist"
   ],
   "scripts": {
+    "build": "tsc -b",
     "db:migrate": "tsx --tsconfig tsconfig.scripts.json scripts/migrate.ts"
   },
   "dependencies": {
