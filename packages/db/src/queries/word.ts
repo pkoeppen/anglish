@@ -152,5 +152,5 @@ export async function getWordsByLemmaId(lemmaId: number) {
     row.links = row.links.map(lemma => `/word/${lemma}`);
   }
 
-  return rows;
+  return { lang: rows[0].lang, words: rows };
 }

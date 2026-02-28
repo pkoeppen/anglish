@@ -14,12 +14,14 @@ export async function getStaticPaths() {
     .distinctOn("lemma.lemma")
     .execute();
 
-    return lemmas.map(lemma => ({ params: { lemma: lemma.lemma }, props: { lemmaId: lemma.id } }));
+  return lemmas.map(lemma => ({
+    params: { lemma: encodeURIComponent(lemma.lemma) }, // encodeURIComponent must be used here.
+    props: { lemmaId: lemma.id },
+  }));
 }
 
 const lemmaId = Astro.props.lemmaId;
-const words = await getWordsByLemmaId(lemmaId);
-const lang = words[0].lang;
+const { lang, words } = await getWordsByLemmaId(lemmaId);
 
 const links = [];
 for (const word of words) {

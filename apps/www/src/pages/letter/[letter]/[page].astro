@@ -17,7 +17,6 @@ export async function getStaticPaths() {
 }
 
 const { letter, page } = Astro.params;
-
 const entries = await getLetterEntries(letter, page, LETTER_ENTRIES_PER_PAGE);
 ---
 
