@@ -1,9 +1,8 @@
 ---
-import { Language } from "@anglish/core";
 import { getLetterEntries } from "@anglish/db";
+import LetterPage from "~/components/LetterPage.astro";
 import { LETTER_ENTRIES_PER_PAGE } from "~/constants";
 import Layout from "~/layouts/Layout.astro";
-import LetterPageNav from "../LetterPageNav.astro";
 
 export function getStaticPaths() {
   return Array.from({ length: 26 }, (_, i) => ({ params: { letter: String.fromCharCode(97 + i) } }));
@@ -14,23 +13,5 @@ const entries = await getLetterEntries(letter, 1, LETTER_ENTRIES_PER_PAGE);
 ---
 
 <Layout>
-  <main class="min-h-[calc(100vh-var(--spacing-nav))] flex flex-col items-center py-12">
-    <div class="font-display text-9xl border-b-4 border-gray-200 pb-4 mb-4">{letter.toUpperCase()}</div>
-    <div class="mt-4 grid grid-cols-5 gap-2 w-full px-12">
-      {entries.map(entry => (
-        <div class="flex items-center gap-2">
-          <div class:list={[
-            entry.lang === Language.Anglish ? "bg-orange-500" : "bg-blue-500",
-          "text-white flex items-center justify-center h-6 w-6 rounded-md text-sm font-bold",
-          ]}
-          >{entry.lang}</div>
-          <a href={`/word/${entry.lemma}`} class="text-xl font-bold hover:underline">
-            {entry.lemma}
-          </a>
-        </div>
-      ))}
-    </div>
-
-    <LetterPageNav letter={letter} />
-  </main>
+  <LetterPage letter={letter} page={1} entries={entries} />
 </Layout>

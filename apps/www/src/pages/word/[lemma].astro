@@ -16,12 +16,12 @@ export async function getStaticPaths() {
 
   return lemmas.map(lemma => ({
     params: { lemma: encodeURIComponent(lemma.lemma) },
-    props: { lemmaId: lemma.id },
+    props: { lemmaId: lemma.id, headword: lemma },
   }));
 }
 
-const lemmaId = Astro.props.lemmaId;
-const { lang, headword, words } = await getWordsByLemmaId(lemmaId);
+const { lemmaId, headword } = Astro.props;
+const { lang, words } = await getWordsByLemmaId(lemmaId);
 
 const links = [];
 for (const word of words) {
@@ -101,7 +101,7 @@ function getSenseRelationText(relation: SenseRelation): string {
                   <div class="flex flex-wrap gap-x-1.5 pt-1 text-lg italic">
                     {synonyms_an.map(synonym => (
                       <a
-                        href={`/word/${synonym.lemma}`}
+                        href={`/word/${encodeURIComponent(synonym.lemma)}`}
                         class="text-orange-600"
                       >
                         {synonym.lemma}
@@ -109,7 +109,7 @@ function getSenseRelationText(relation: SenseRelation): string {
                     ))}
                     {synonyms_en.map(synonym => (
                       <a
-                        href={`/word/${synonym.lemma}`}
+                        href={`/word/${encodeURIComponent(synonym.lemma)}`}
                         class="text-blue-700"
                       >
                         {synonym.lemma}
@@ -122,7 +122,7 @@ function getSenseRelationText(relation: SenseRelation): string {
                         <div>{getSenseRelationText(relation as SenseRelation)}</div>
                         {items.map(item => (
                           <a
-                            href={`/word/${item.lemma}`}
+                            href={`/word/${encodeURIComponent(item.lemma)}`}
                             class:list={[
                               item.lang === Language.Anglish ? "text-orange-600" : "text-blue-700",
                             ]}
