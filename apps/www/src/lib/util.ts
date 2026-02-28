@@ -3,6 +3,10 @@ import { WordnetPOS } from "@anglish/core";
 import { getTotalPages } from "@anglish/db";
 import { LETTER_ENTRIES_PER_PAGE } from "~/constants";
 
+export function slugify(str: string) {
+  return str.replace(/[^\p{L}0-9]/gu, "-");
+}
+
 export function readablePos(pos: WordnetPOS) {
   switch (pos) {
     case WordnetPOS.Noun:

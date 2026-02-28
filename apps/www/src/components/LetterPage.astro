@@ -1,5 +1,6 @@
 ---
 import { Language } from "@anglish/core";
+import { slugify } from "~/lib/util";
 import LetterPageNav from "./LetterPageNav.astro";
 
 const { letter, page, entries } = Astro.props as {
@@ -19,7 +20,7 @@ const { letter, page, entries } = Astro.props as {
         "text-white flex items-center justify-center h-6 w-6 rounded-md text-sm font-bold",
         ]}
         >{entry.lang}</div>
-        <a href={`/word/${encodeURIComponent(entry.lemma)}`} class="text-xl font-bold hover:underline">
+        <a href={`/word/${slugify(entry.lemma)}`} class="text-xl font-bold hover:underline">
           {entry.lemma}
         </a>
       </div>

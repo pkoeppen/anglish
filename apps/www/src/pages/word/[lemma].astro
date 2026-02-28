@@ -2,7 +2,7 @@
 import { Language, SenseRelation } from "@anglish/core";
 import { db, getWordsByLemmaId } from "@anglish/db";
 import Layout from "~/layouts/Layout.astro";
-import { readablePos } from "~/lib/util";
+import { readablePos, slugify } from "~/lib/util";
 
 export async function getStaticPaths() {
   const lemmas = await db.kysely
@@ -15,7 +15,7 @@ export async function getStaticPaths() {
     .execute();
 
   return lemmas.map(lemma => ({
-    params: { lemma: encodeURIComponent(lemma.lemma) },
+    params: { lemma: slugify(lemma.lemma) },
     props: { lemmaId: lemma.id, headword: lemma },
   }));
 }
@@ -101,7 +101,7 @@ function getSenseRelationText(relation: SenseRelation): string {
                   <div class="flex flex-wrap gap-x-1.5 pt-1 text-lg italic">
                     {synonyms_an.map(synonym => (
                       <a
-                        href={`/word/${encodeURIComponent(synonym.lemma)}`}
+                        href={`/word/${slugify(synonym.lemma)}`}
                         class="text-orange-600"
                       >
                         {synonym.lemma}
@@ -109,7 +109,7 @@ function getSenseRelationText(relation: SenseRelation): string {
                     ))}
                     {synonyms_en.map(synonym => (
                       <a
-                        href={`/word/${encodeURIComponent(synonym.lemma)}`}
+                        href={`/word/${slugify(synonym.lemma)}`}
                         class="text-blue-700"
                       >
                         {synonym.lemma}
@@ -122,7 +122,7 @@ function getSenseRelationText(relation: SenseRelation): string {
                         <div>{getSenseRelationText(relation as SenseRelation)}</div>
                         {items.map(item => (
                           <a
-                            href={`/word/${encodeURIComponent(item.lemma)}`}
+                            href={`/word/${slugify(item.lemma)}`}
                             class:list={[
                               item.lang === Language.Anglish ? "text-orange-600" : "text-blue-700",
                             ]}
