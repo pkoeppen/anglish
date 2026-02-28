@@ -1,10 +1,9 @@
 import type { Language, SenseRelation, WordnetPOS } from "@anglish/core";
 import { dedent } from "@anglish/core";
 import { sql } from "kysely";
-import { escapeLiteral } from "pg";
 import { db } from "../client";
 
-export interface WordsByLemmaResult {
+interface WordsByLemmaResult {
   lemma: string;
   pos: WordnetPOS;
   lang: Language;
@@ -22,6 +21,7 @@ export interface WordsByLemmaResult {
       }[];
     };
   }[];
+  links: string[];
 }
 
 export async function getWordsByLemmaId(lemmaId: number) {
@@ -108,14 +108,19 @@ export async function getWordsByLemmaId(lemmaId: number) {
       FROM sense_rel_arrays
       GROUP BY seed_sense_id
     ),
+    link_rows AS (
+      SELECT lemma AS link FROM syn_en_rows UNION
+      SELECT lemma AS link FROM syn_an_rows UNION
+      SELECT lemma AS link FROM sense_rel_rows
+    ),
     senses AS (
       SELECT
         seed.lemma_id,
         seed.lemma,
         seed.pos,
         seed.lang,
-        JSON_AGG(
-          JSON_BUILD_OBJECT(
+        JSONB_AGG(
+          JSONB_BUILD_OBJECT(
             'sense_id', seed.sense_id,
             'index',    seed.sense_index,
             'gloss',    seed.gloss,
@@ -124,7 +129,8 @@ export async function getWordsByLemmaId(lemmaId: number) {
             'relations', COALESCE(sense_rel.relations, '{}'::JSONB)
           )
           ORDER BY seed.sense_index
-        ) AS senses
+        ) AS senses,
+        (SELECT COALESCE(JSONB_AGG(link), '[]'::JSONB) FROM link_rows) AS links
       FROM seed
       LEFT JOIN syn_en ON syn_en.sense_id = seed.sense_id
       LEFT JOIN syn_an ON syn_an.sense_id = seed.sense_id
@@ -135,11 +141,16 @@ export async function getWordsByLemmaId(lemmaId: number) {
       lemma,
       pos,
       lang,
-      senses
-    FROM senses;
+      senses,
+      links
+    FROM senses
   `;
 
-  const result = await sql.raw<WordsByLemmaResult>(queryString).execute(db.kysely);
+  const { rows } = await sql.raw<WordsByLemmaResult>(queryString).execute(db.kysely);
 
-  return result.rows;
+  for (const row of rows) {
+    row.links = row.links.map(lemma => `/word/${lemma}`);
+  }
+
+  return rows;
 }

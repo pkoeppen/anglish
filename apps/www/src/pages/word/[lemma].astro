@@ -2,7 +2,7 @@
 import { Language, SenseRelation } from "@anglish/core";
 import { db, getWordsByLemmaId } from "@anglish/db";
 import Layout from "~/layouts/Layout.astro";
-import { readablePos, slugify } from "~/lib/util";
+import { readablePos } from "~/lib/util";
 
 export async function getStaticPaths() {
   const lemmas = await db.kysely
@@ -14,12 +14,17 @@ export async function getStaticPaths() {
     .distinctOn("lemma.lemma")
     .execute();
 
-    return lemmas.map(lemma => ({ params: { lemma: slugify(lemma.lemma) }, props: { lemmaId: lemma.id } }));
+    return lemmas.map(lemma => ({ params: { lemma: lemma.lemma }, props: { lemmaId: lemma.id } }));
 }
 
 const lemmaId = Astro.props.lemmaId;
 const words = await getWordsByLemmaId(lemmaId);
 const lang = words[0].lang;
+
+const links = [];
+for (const word of words) {
+  links.push(...word.links);
+}
 
 function getSenseRelationText(relation: SenseRelation): string {
   switch (relation) {
@@ -72,6 +77,9 @@ function getSenseRelationText(relation: SenseRelation): string {
 ---
 
 <Layout>
+  <Fragment slot="head">
+    {links.map(href => (<link href={href} rel="prefetch" />))}
+  </Fragment>
   <main class="min-h-[calc(100vh-var(--spacing-nav))] flex flex-col items-center py-12">
     <div class:list={[
       lang === Language.Anglish ? "font-display text-7xl" : "font-serif text-7xl",
@@ -91,7 +99,7 @@ function getSenseRelationText(relation: SenseRelation): string {
                   <div class="flex flex-wrap gap-x-1.5 pt-1 text-lg italic">
                     {synonyms_an.map(synonym => (
                       <a
-                        href={`/word/${slugify(synonym.lemma)}`}
+                        href={`/word/${synonym.lemma}`}
                         class="text-orange-600"
                       >
                         {synonym.lemma}
@@ -99,7 +107,7 @@ function getSenseRelationText(relation: SenseRelation): string {
                     ))}
                     {synonyms_en.map(synonym => (
                       <a
-                        href={`/word/${slugify(synonym.lemma)}`}
+                        href={`/word/${synonym.lemma}`}
                         class="text-blue-700"
                       >
                         {synonym.lemma}
@@ -112,7 +120,7 @@ function getSenseRelationText(relation: SenseRelation): string {
                         <div>{getSenseRelationText(relation as SenseRelation)}</div>
                         {items.map(item => (
                           <a
-                            href={`/word/${slugify(item.lemma)}`}
+                            href={`/word/${item.lemma}`}
                             class:list={[
                               item.lang === Language.Anglish ? "text-orange-600" : "text-blue-700",
                             ]}

@@ -15,11 +15,3 @@ export function readablePos(pos: WordnetPOS) {
       return "unknown";
   }
 }
-
-export function slugify(text: string) {
-  return encodeURIComponent(text);
-}
-
-export function unslugify(text: string) {
-  return decodeURIComponent(text);
-}

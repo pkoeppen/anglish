@@ -14,7 +14,9 @@
   ],
   "include": [
     ".astro/types.d.ts",
-    "**/*"
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.astro"
   ],
   "exclude": [
     "dist"

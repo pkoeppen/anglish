@@ -3,7 +3,6 @@ import { Language } from "@anglish/core";
 import { getLetterEntries } from "@anglish/db";
 import { LETTER_ENTRIES_PER_PAGE } from "~/constants";
 import Layout from "~/layouts/Layout.astro";
-import { slugify } from "~/lib/util";
 import LetterPageNav from "../../LetterPageNav.astro";
 
 export function getStaticPaths() {
@@ -11,7 +10,6 @@ export function getStaticPaths() {
 }
 
 const { letter } = Astro.params;
-
 const entries = await getLetterEntries(letter, 1, LETTER_ENTRIES_PER_PAGE, Language.Anglish);
 ---
 
@@ -26,7 +24,7 @@ const entries = await getLetterEntries(letter, 1, LETTER_ENTRIES_PER_PAGE, Langu
           "text-white flex items-center justify-center h-6 w-6 rounded-md text-sm font-bold",
           ]}
           >{entry.lang}</div>
-          <a href={`/word/${slugify(entry.lemma)}`} class="text-xl font-bold hover:underline">
+          <a href={`/word/${entry.lemma}`} class="text-xl font-bold hover:underline">
             {entry.lemma}
           </a>
         </div>
