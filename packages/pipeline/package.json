@@ -5,17 +5,6 @@
   },
   "type": "module",
   "version": "0.1.0",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "etl": "pnpm run fetch && pnpm run parse && pnpm run normalize-pre && pnpm run merge && pnpm run normalize-post && pnpm run map",
     "fetch": "tsx src/cli.ts fetch",
@@ -30,7 +19,6 @@
     "kysely": "0.28.9"
   },
   "devDependencies": {
-    "@anglish/config": "workspace:*",
     "@anglish/core": "workspace:*",
     "@anglish/db": "workspace:*",
     "cheerio": "1.1.2",

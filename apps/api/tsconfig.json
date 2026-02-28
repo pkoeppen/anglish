@@ -1,16 +1,23 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
+    "target": "ES2022",
     "lib": ["ES2022"],
     "rootDir": "src",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "types": ["node"],
+    "strict": true,
     "declaration": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
   },
   "references": [
     { "path": "../../packages/core" },
     { "path": "../../packages/db" }
   ],
-  "include": ["src/**/*.ts"]
+  "include": ["**/*.ts"]
 }

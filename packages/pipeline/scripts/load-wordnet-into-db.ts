@@ -4,8 +4,7 @@ import type { Selectable } from "kysely";
 import type { WordnetSense } from "../src/types";
 import process from "node:process";
 import { Language, SenseRelation, Source, SynsetRelation } from "@anglish/core";
-import { db } from "@anglish/db";
-import { PG_MAX_PARAMETERS } from "@anglish/db/constants";
+import { db, PG_MAX_PARAMETERS } from "@anglish/db";
 import { loadWordnetEntries, loadWordnetSynsetsWithCategory } from "../src/lib/wordnet";
 
 function chunk<T>(arr: T[], size: number) {

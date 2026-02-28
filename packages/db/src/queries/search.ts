@@ -32,8 +32,8 @@ export async function vectorSearchHNSW(
 ): Promise<VectorSearchResult[]> {
   const embedding = await createEmbedding(text);
 
-  const filter = pos ? `@pos:{${pos}} ` : "";
-  const query = `${filter}=>[KNN ${k} @vector $query_vector AS score]`;
+  const filter = pos ? `@pos:{${pos}} ` : "*";
+  const query = `${filter}=>[KNN ${k} @embedding $query_vector AS score]`;
   const float32 = new Float32Array(embedding);
   const bytes = Buffer.from(float32.buffer, float32.byteOffset, float32.byteLength);
 
