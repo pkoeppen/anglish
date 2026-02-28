@@ -15,13 +15,13 @@ export async function getStaticPaths() {
     .execute();
 
   return lemmas.map(lemma => ({
-    params: { lemma: encodeURIComponent(lemma.lemma) }, // encodeURIComponent must be used here.
+    params: { lemma: encodeURIComponent(lemma.lemma) },
     props: { lemmaId: lemma.id },
   }));
 }
 
 const lemmaId = Astro.props.lemmaId;
-const { lang, words } = await getWordsByLemmaId(lemmaId);
+const { lang, headword, words } = await getWordsByLemmaId(lemmaId);
 
 const links = [];
 for (const word of words) {
@@ -78,7 +78,7 @@ function getSenseRelationText(relation: SenseRelation): string {
 }
 ---
 
-<Layout>
+<Layout title={`${headword} ⌁ The Anglish Wiki`}>
   <Fragment slot="head">
     {links.map(href => (<link href={href} rel="prefetch" />))}
   </Fragment>

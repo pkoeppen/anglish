@@ -3,6 +3,8 @@ import { Font } from "astro:assets";
 import LetterNav from "../components/LetterNav";
 import SearchBar from "../components/SearchBar";
 import "../styles/global.css";
+
+const { title } = Astro.props;
 ---
 <!doctype html>
 <html lang="en">
@@ -12,7 +14,7 @@ import "../styles/global.css";
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="generator" content={Astro.generator} />
-    <title>Astro Basics</title>
+    <title>{title || "The Anglish Wiki"}</title>
     <Font cssVariable="--font-roboto" preload />
     <Font cssVariable="--font-faustina" preload />
     <Font cssVariable="--font-unifraktur" preload />
