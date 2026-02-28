@@ -1,7 +1,7 @@
 import type { KyselyConfig, LogEvent } from "kysely";
 import type { DB } from "./tables";
 import process from "node:process";
-import { assertEnv, logger } from "@anglish/core";
+import { assertEnv, logger } from "@anglish/core/server";
 import { Kysely, PostgresDialect } from "kysely";
 import pg from "pg";
 import { initParsers } from "./parsers";

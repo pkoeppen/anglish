@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "lib": ["ES2022"],
+    "rootDir": "src",
+    "types": ["node"],
+    "declaration": true,
+    "outDir": "dist"
+  },
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/db" }
+  ],
+  "include": ["src/**/*.ts"]
+}

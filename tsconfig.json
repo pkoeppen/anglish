@@ -5,6 +5,7 @@
     { "path": "./packages/core" },
     { "path": "./packages/db" },
     { "path": "./packages/pipeline" },
+    { "path": "./apps/api" },
     { "path": "./apps/www" }
   ]
 }

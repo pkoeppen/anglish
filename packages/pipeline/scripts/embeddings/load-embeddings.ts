@@ -1,34 +1,40 @@
+import type { SynsetDataRedisJSON } from "@anglish/db";
 import type { RedisJSON } from "redis";
-import type { SynsetEmbeddingJSON } from "../../src/types";
+import type { SynsetEmbeddingJSONL } from "../../src/types";
 import { Buffer } from "node:buffer";
 import { open } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { redis } from "@anglish/db";
-import { dataRoot, REDIS_FLAT_PREFIX, REDIS_HNSW_PREFIX } from "../../src/constants";
+import { redis, REDIS_SYNSET_DATA_PREFIX, REDIS_SYNSET_SEARCH_PREFIX } from "@anglish/db";
+import { dataRoot } from "../../src/constants";
 
 function f32ToBuf(v: Float32Array) {
   return Buffer.from(v.buffer, v.byteOffset, v.byteLength);
 }
 
-async function loadSynsetEmbeddings() {
+/**
+ * This function populates the Redis index used by the API app to search the top
+ * synset matches for the given query string. Refer to @anglish/db/src/queries/search.ts.
+ */
+async function loadSynsetSearchHashes() {
   const embeddingsFile = path.join(dataRoot, "anglish", "synset_embeddings.jsonl");
+
   console.log(`Loading synset embeddings from ${embeddingsFile}`);
 
   const embeddingsStream = await open(embeddingsFile);
 
-  console.log(`Inserting synset embeddings into Redis (${REDIS_HNSW_PREFIX}*)...`);
+  console.log(`Inserting synset embeddings into Redis (${REDIS_SYNSET_SEARCH_PREFIX}*)...`);
 
   let totalProcessed = 0;
   const BATCH_SIZE = 1000;
-  const batch: SynsetEmbeddingJSON[] = [];
+  const batch: SynsetEmbeddingJSONL[] = [];
 
   const processBatch = async () => {
     await Promise.all(batch.map(async (embedding) => {
-      const key = `${REDIS_HNSW_PREFIX}${embedding.id}`;
+      const key = `${REDIS_SYNSET_SEARCH_PREFIX}${embedding.synsetId}`;
       const f32 = new Float32Array(embedding.embedding);
       const buf = f32ToBuf(f32);
-      return redis.hSet(key, { pos: embedding.pos, vector: buf });
+      return redis.hSet(key, { synset_id: embedding.synsetId, embedding: buf });
     }));
     totalProcessed += batch.length;
     process.stdout.write(`\r └─ Processed ${totalProcessed} synset embeddings`.gray);
@@ -50,22 +56,34 @@ async function loadSynsetEmbeddings() {
   process.stdout.write("\n");
 }
 
-async function loadSynsetEmbeddingsJSON() {
+/**
+ * This function populates the Redis index used by the pipeline to query the top
+ * synset matches for a given gloss. Refer to stages/06_map.ts for the implementation.
+ */
+async function loadSynsetDataJSON() {
   const embeddingsFile = path.join(dataRoot, "anglish", "synset_embeddings.jsonl");
+
   console.log(`Loading synset embeddings from ${embeddingsFile}`);
 
   const embeddingsStream = await open(embeddingsFile);
 
-  console.log(`Inserting synset embeddings into Redis (${REDIS_FLAT_PREFIX}*)...`);
+  console.log(`Inserting synset embeddings into Redis (${REDIS_SYNSET_DATA_PREFIX}*)...`);
 
   let totalProcessed = 0;
   const BATCH_SIZE = 1000;
-  const batch: SynsetEmbeddingJSON[] = [];
+  const batch: SynsetEmbeddingJSONL[] = [];
 
   const processBatch = async () => {
     await Promise.all(batch.map(async (embedding) => {
-      const key = `${REDIS_FLAT_PREFIX}${embedding.id}`;
-      return redis.json.set(key, "$", embedding as unknown as RedisJSON);
+      const key = `${REDIS_SYNSET_DATA_PREFIX}${embedding.synsetId}`;
+      const json: SynsetDataRedisJSON = {
+        synset_id: embedding.synsetId,
+        pos: embedding.pos,
+        category: embedding.category,
+        headword: embedding.headword,
+        embedding: embedding.embedding,
+      };
+      return redis.json.set(key, "$", json as unknown as RedisJSON);
     }));
     totalProcessed += batch.length;
     process.stdout.write(`\r └─ Processed ${totalProcessed} synset embeddings`.gray);
@@ -90,13 +108,12 @@ async function loadSynsetEmbeddingsJSON() {
 async function main() {
   const argv = process.argv.slice(2);
   const flags = new Set(argv);
-  const json = flags.has("--json");
 
-  if (json) {
-    await loadSynsetEmbeddingsJSON();
+  if (flags.has("--data")) {
+    await loadSynsetDataJSON();
   }
-  else {
-    await loadSynsetEmbeddings();
+  if (flags.has("--search")) {
+    await loadSynsetSearchHashes();
   }
 }
 

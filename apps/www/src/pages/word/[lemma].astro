@@ -1,8 +1,8 @@
 ---
-import { Language, SenseRelation } from "@anglish/core";
+import { Language, SenseRelation, slugify } from "@anglish/core";
 import { db, getWordsByLemmaId } from "@anglish/db";
 import Layout from "~/layouts/Layout.astro";
-import { readablePos, slugify } from "~/lib/util";
+import { readablePos } from "~/lib/util";
 
 export async function getStaticPaths() {
   const lemmas = await db.kysely

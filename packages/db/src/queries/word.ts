@@ -1,5 +1,5 @@
 import type { Language, SenseRelation, WordnetPOS } from "@anglish/core";
-import { dedent } from "@anglish/core";
+import { dedent, slugify } from "@anglish/core";
 import { sql } from "kysely";
 import { db } from "../client";
 
@@ -149,7 +149,7 @@ export async function getWordsByLemmaId(lemmaId: number) {
   const { rows } = await sql.raw<WordsByLemmaResult>(queryString).execute(db.kysely);
 
   for (const row of rows) {
-    row.links = row.links.map(lemma => `/word/${lemma}`);
+    row.links = row.links.map(lemma => `/word/${slugify(lemma)}`);
   }
 
   return { lang: rows[0].lang, words: rows };

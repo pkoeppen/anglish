@@ -1,6 +1,6 @@
 import type { RedisClientType } from "redis";
 import process from "node:process";
-import { assertEnv } from "@anglish/core";
+import { assertEnv } from "@anglish/core/server";
 import { createClient } from "redis";
 
 assertEnv([

@@ -1,4 +1,5 @@
 import type { WordnetPOS } from "@anglish/core";
+import type { Buffer } from "node:buffer";
 
 export interface WordnetPOSEntry {
   sense: WordnetSense[];
@@ -75,10 +76,11 @@ export interface WordnetFrame {
   template: string;
 }
 
-export interface SynsetEmbeddingJSON {
-  id: string;
+export interface SynsetEmbeddingJSONL {
+  synsetId: string;
   pos: WordnetPOS;
   category: string;
   headword: string;
+  members: string[];
   embedding: number[];
 }
