@@ -1,5 +1,5 @@
 import type { WordnetPOS } from "@anglish/core";
-import type { SynsetEmbeddingJSONL } from "../../src/types";
+import type { RedisSynsetData } from "@anglish/db";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -8,15 +8,15 @@ import { dataRoot } from "../../src/constants";
 import { makeLimiter, retry } from "../../src/lib/util";
 import { loadWordnetSynsetsWithCategory } from "../../src/lib/wordnet";
 
-export async function createSynsetEmbeddingJSONL() {
-  const outFile = path.join(dataRoot, "anglish", "synset_embeddings.jsonl");
+export async function createSynsetDataJSONL() {
+  const outFile = path.join(dataRoot, "anglish", "redis_synset_data.jsonl");
   const outStream = fs.createWriteStream(outFile);
   const synsets = loadWordnetSynsetsWithCategory();
 
   const concurrency = 30;
   const run = makeLimiter(concurrency, 4500);
 
-  console.log(`Creating embeddings for ${Object.keys(synsets).length} synsets`);
+  console.log(`Creating Redis JSON for ${Object.keys(synsets).length} synsets`);
 
   await Promise.all(
     Object.entries(synsets).map(([id, synset]) =>
@@ -24,8 +24,8 @@ export async function createSynsetEmbeddingJSONL() {
         const definition = synset.definition.shift()!;
         const embeddingText = `${synset.members.join(", ")} - ${definition}`;
         const embedding = await retry(() => createEmbedding(embeddingText));
-        const json: SynsetEmbeddingJSONL = {
-          synsetId: id,
+        const json: RedisSynsetData = {
+          synset_id: id,
           pos: synset.partOfSpeech as WordnetPOS,
           category: synset.category,
           headword: synset.members[0]!,
@@ -41,7 +41,7 @@ export async function createSynsetEmbeddingJSONL() {
 }
 
 async function main() {
-  await createSynsetEmbeddingJSONL();
+  await createSynsetDataJSONL();
 }
 
 main().then(() => {

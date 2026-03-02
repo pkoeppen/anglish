@@ -2,21 +2,20 @@ import process from "node:process";
 import {
   redis,
   REDIS_SYNSET_DATA_PREFIX,
-  REDIS_SYNSET_DATA_VSS_INDEX,
-  REDIS_SYNSET_SEARCH_PREFIX,
-  REDIS_SYNSET_SEARCH_VSS_INDEX,
+  REDIS_SYNSET_FLAT_VSS_INDEX,
+  REDIS_SYNSET_HNSW_VSS_INDEX,
 } from "@anglish/db";
 import { SCHEMA_FIELD_TYPE } from "redis";
 
 async function createSynsetSearchIndex() {
-  const key = REDIS_SYNSET_SEARCH_VSS_INDEX;
+  const key = REDIS_SYNSET_HNSW_VSS_INDEX;
 
   await dropIndex(key);
 
-  console.log(`Creating index ${key}...`);
+  process.stdout.write(`Creating index ${key}...`);
   await redis.ft.create(key, {
-    synset_id: { type: SCHEMA_FIELD_TYPE.TEXT, AS: "synset_id" },
-    embedding: {
+    "$.pos": { type: SCHEMA_FIELD_TYPE.TAG, AS: "pos" },
+    "$.embedding": {
       type: SCHEMA_FIELD_TYPE.VECTOR,
       AS: "embedding",
       ALGORITHM: "HNSW",
@@ -28,22 +27,22 @@ async function createSynsetSearchIndex() {
       EF_CONSTRUCTION: 200,
     },
   }, {
-    ON: "HASH",
-    PREFIX: REDIS_SYNSET_SEARCH_PREFIX,
+    ON: "JSON",
+    PREFIX: REDIS_SYNSET_DATA_PREFIX,
   });
 
-  console.log(`Done.`);
+  process.stdout.write(" Done\n");
 }
 
 async function createSynsetDataIndex() {
-  const key = REDIS_SYNSET_DATA_VSS_INDEX;
+  const key = REDIS_SYNSET_FLAT_VSS_INDEX;
 
   await dropIndex(key);
 
-  console.log(`Creating index ${key}...`);
+  process.stdout.write(`Creating index ${key}...`);
   await redis.ft.create(key, {
     "$.pos": { type: SCHEMA_FIELD_TYPE.TAG, AS: "pos" },
-    "$.embedding": {
+    "$.vector": {
       type: SCHEMA_FIELD_TYPE.VECTOR,
       AS: "vector",
       ALGORITHM: "FLAT",
@@ -57,24 +56,30 @@ async function createSynsetDataIndex() {
     PREFIX: REDIS_SYNSET_DATA_PREFIX,
   });
 
-  console.log(`Done.`);
+  process.stdout.write(" Done\n");
+}
+
+async function flushAll() {
+  process.stdout.write("Flushing Redis...");
+  await redis.flushAll();
+  process.stdout.write(" Done\n");
 }
 
 async function dropIndex(key: string) {
-  console.log(`Dropping index ${key}...`);
+  process.stdout.write(`Dropping index ${key}...`);
   await redis.ft.dropIndex(key, { DD: true }).then(() => {}, () => {});
+  process.stdout.write(" Done\n");
 }
 
 async function main() {
   const argv = process.argv.slice(2);
   const flags = new Set(argv);
 
-  if (flags.has("--data")) {
-    await createSynsetDataIndex();
+  if (flags.has("--flush")) {
+    await flushAll();
   }
-  if (flags.has("--search")) {
-    await createSynsetSearchIndex();
-  }
+  await createSynsetDataIndex();
+  await createSynsetSearchIndex();
 }
 
 main().then(() => {

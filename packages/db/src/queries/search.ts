@@ -1,10 +1,5 @@
 import { Buffer } from "node:buffer";
-import { db } from "../client";
-import {
-  REDIS_SYNSET_DATA_PREFIX,
-  REDIS_SYNSET_SEARCH_PREFIX,
-  REDIS_SYNSET_SEARCH_VSS_INDEX,
-} from "../constants";
+import { REDIS_SYNSET_HNSW_VSS_INDEX } from "../constants";
 import { createEmbedding } from "../lib";
 import { redis } from "../redis";
 
@@ -17,27 +12,20 @@ interface VectorSearchResult {
   score: number;
 }
 
-interface SynsetEmbeddingJSON {
-  id: string;
-  pos: string;
-  category: string;
-  headword: string;
-  embedding: number[];
-}
-
 export async function vectorSearchHNSW(
   text: string,
   pos?: string,
   k = 20,
 ): Promise<VectorSearchResult[]> {
   const embedding = await createEmbedding(text);
-
   const filter = pos ? `@pos:{${pos}} ` : "*";
   const query = `${filter}=>[KNN ${k} @embedding $query_vector AS score]`;
   const float32 = new Float32Array(embedding);
   const bytes = Buffer.from(float32.buffer, float32.byteOffset, float32.byteLength);
 
-  const results = await redis.ft.search(REDIS_SYNSET_SEARCH_VSS_INDEX, query, {
+  console.log("query:", query);
+
+  const vssResult = await redis.ft.search(REDIS_SYNSET_HNSW_VSS_INDEX, query, {
     SORTBY: "score",
     RETURN: ["score", "pos"],
     DIALECT: 2,
@@ -50,53 +38,26 @@ export async function vectorSearchHNSW(
     },
   });
 
-  console.log(results.documents);
+  const pipeline = redis.multi();
+  for (const { id: key } of vssResult.documents) {
+    pipeline.json.get(key, { path: "$" });
+  }
+
+  const dataResults = await pipeline.exec();
+
+  const RESULTS_LENGTH = 10;
+  const results = new Set<string>();
+  main: for (let i = 0; i < dataResults.length; i++) {
+    const { pos, members } = (dataResults as any)[i][0];
+    for (const member of members) {
+      results.add(member);
+      if (results.size >= RESULTS_LENGTH) {
+        break main;
+      }
+    }
+  }
+
+  console.log(results);
+
   return [] as any;
-
-  const synsets = await Promise.all(
-    results.documents.map(async ({ id, value: { score } }) => {
-      const synsetId = id.startsWith(REDIS_SYNSET_SEARCH_PREFIX)
-        ? id.slice(REDIS_SYNSET_SEARCH_PREFIX.length)
-        : id;
-      const jsonKey = `${REDIS_SYNSET_DATA_PREFIX}${synsetId}`;
-      const synsetJson = await redis.json.get(jsonKey) as SynsetEmbeddingJSON | null;
-
-      if (synsetJson) {
-        return {
-          id: synsetJson.id,
-          pos: synsetJson.pos,
-          category: synsetJson.category,
-          headword: synsetJson.headword,
-          score: Number(score),
-        };
-      }
-
-      const synset = await db.kysely
-        .selectFrom("synset")
-        .select(["id", "pos", "gloss", "category"])
-        .where("id", "=", synsetId)
-        .executeTakeFirst();
-
-      if (synset) {
-        return {
-          id: synset.id,
-          pos: synset.pos,
-          category: synset.category ?? "",
-          headword: synset.gloss?.split(";")[0] ?? synset.id,
-          gloss: synset.gloss,
-          score: Number(score),
-        };
-      }
-
-      return {
-        id: synsetId,
-        pos: "",
-        category: "",
-        headword: synsetId,
-        score: Number(score),
-      };
-    }),
-  );
-
-  return synsets;
 }

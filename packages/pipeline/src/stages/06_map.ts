@@ -1,11 +1,11 @@
-import type { NewLemma, NewSense, SynsetDataRedisJSON } from "@anglish/db";
+import type { NewLemma, NewSense, RedisSynsetData } from "@anglish/db";
 import type { PostNormalizedRecord } from "./05_normalize_post";
 import { Buffer } from "node:buffer";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
 import { Language, WordnetPOS } from "@anglish/core";
-import { createEmbedding, db, redis, REDIS_SYNSET_DATA_VSS_INDEX } from "@anglish/db";
+import { createEmbedding, db, redis, REDIS_SYNSET_FLAT_VSS_INDEX } from "@anglish/db";
 import { makeLimiter, readJsonl } from "../lib/util";
 
 export interface MapStageConfig {
@@ -110,12 +110,11 @@ interface VectorSearchResult {
 
 async function vectorSearch(text: string, pos: WordnetPOS, k = 20): Promise<VectorSearchResult[]> {
   const embedding = await createEmbedding(text);
-
-  const query = `@pos:{${pos}} =>[KNN ${k} @vector $query_vector AS score]`;
+  const query = `@pos:{${pos}} =>[KNN ${k} @embedding $query_vector AS score]`;
   const float32 = new Float32Array(embedding);
   const bytes = Buffer.from(float32.buffer);
 
-  const results = await redis.ft.search(REDIS_SYNSET_DATA_VSS_INDEX, query, {
+  const results = await redis.ft.search(REDIS_SYNSET_FLAT_VSS_INDEX, query, {
     SORTBY: "score",
     RETURN: ["score", "pos"],
     DIALECT: 2,
@@ -129,7 +128,7 @@ async function vectorSearch(text: string, pos: WordnetPOS, k = 20): Promise<Vect
   });
 
   const synsets = await Promise.all(results.documents.map(async ({ id, value: { score } }) => {
-    const synset = await redis.json.get(id) as unknown as SynsetDataRedisJSON;
+    const synset = await redis.json.get(id) as unknown as RedisSynsetData;
     return {
       synsetId: synset.synset_id,
       pos: synset.pos,

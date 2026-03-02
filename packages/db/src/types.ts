@@ -1,15 +1,10 @@
 import type { WordnetPOS } from "@anglish/core";
-import type { Buffer } from "node:buffer";
 
-export interface SynsetDataRedisJSON {
+export interface RedisSynsetData {
   synset_id: string;
   pos: WordnetPOS;
   category: string;
   headword: string;
+  members: string[];
   embedding: number[];
-}
-
-export interface SynsetSearchRedisHash {
-  synset_id: string;
-  embedding: Buffer;
 }
