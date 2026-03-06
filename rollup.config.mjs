@@ -1,4 +1,5 @@
-// rollup.config.mjs at monorepo root
+import path from "node:path";
+import alias from "@rollup/plugin-alias";
 import commonjs from "@rollup/plugin-commonjs";
 import json from "@rollup/plugin-json";
 import resolve from "@rollup/plugin-node-resolve";
@@ -7,8 +8,11 @@ import esbuild from "rollup-plugin-esbuild";
 
 const external = [/^node:/, /^@anglish\//];
 
-function buildPackage(pkg) {
-  const { input, outputDir, tsconfig } = pkg;
+function buildPackage({ rootDir, ...pkg }) {
+  const srcDir = path.resolve(rootDir, 'src');
+  const outputDir = path.resolve(rootDir, pkg.outputDir ?? 'dist'); 
+  const tsconfig = path.resolve(rootDir, 'tsconfig.json');
+  const input = path.resolve(rootDir, pkg.input);
   return [
     {
       input,
@@ -19,6 +23,12 @@ function buildPackage(pkg) {
       },
       external,
       plugins: [
+        alias({
+          entries: [{
+            find: '~',
+            replacement: srcDir,
+          }]
+        }),
         resolve({ extensions: [".mjs", ".js", ".ts", ".json"] }),
         commonjs(),
         json(),
@@ -36,18 +46,21 @@ function buildPackage(pkg) {
 
 export default [
   ...buildPackage({
-    input: "packages/core/src/global/index.ts",
-    outputDir: "packages/core/dist/global",
-    tsconfig: "packages/core/tsconfig.json",
+    rootDir: "packages/core",
+    input: "src/global/index.ts",
+    outputDir: "dist/global",
   }),
   ...buildPackage({
-    input: "packages/core/src/server/index.ts",
-    outputDir: "packages/core/dist/server",
-    tsconfig: "packages/core/tsconfig.json",
+    rootDir: "packages/core",
+    input: "src/server/index.ts",
+    outputDir: "dist/server",
   }),
   ...buildPackage({
-    input: "packages/db/src/index.ts",
-    outputDir: "packages/db/dist",
-    tsconfig: "packages/db/tsconfig.json",
+    rootDir: "packages/db",
+    input: "src/index.ts",
+  }),
+  ...buildPackage({
+    rootDir: "apps/api",
+    input: "src/app.ts",
   }),
 ].flat();

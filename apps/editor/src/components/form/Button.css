@@ -1,0 +1,175 @@
+/* ─── Base ─────────────────────────────────────────────────────────────── */
+
+.button {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  height: var(--height-md);
+  padding: 0 1rem;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: var(--transition);
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-ring-offset), 0 0 0 4px var(--color-ring);
+}
+
+.button:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.button:active {
+  box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.1);
+}
+
+/* ─── Color tokens ─────────────────────────────────────────────────────── */
+/*
+  Each color class sets --btn-* custom properties.
+  Style classes below consume them, keeping selectors flat.
+*/
+
+.button-color-default {
+  --btn-solid-bg:       var(--color-primary);
+  --btn-solid-fg:       var(--color-primary-fg);
+  --btn-solid-hover:    var(--color-primary-hover);
+  --btn-soft-bg:        var(--color-secondary);
+  --btn-soft-fg:        var(--color-primary);
+  --btn-soft-hover:     var(--color-secondary-hover);
+  --btn-border:         var(--color-border);
+  --btn-text:           var(--color-foreground);
+}
+
+.button-color-red {
+  --btn-solid-bg:       var(--color-red);
+  --btn-solid-fg:       var(--color-red-fg);
+  --btn-solid-hover:    var(--color-red-hover);
+  --btn-soft-bg:        var(--color-red-soft);
+  --btn-soft-fg:        var(--color-red);
+  --btn-soft-hover:     var(--color-red-soft-hover);
+  --btn-border:         var(--color-red);
+  --btn-text:           var(--color-red);
+}
+
+.button-color-yellow {
+  --btn-solid-bg:       var(--color-yellow);
+  --btn-solid-fg:       var(--color-yellow-fg);
+  --btn-solid-hover:    var(--color-yellow-hover);
+  --btn-soft-bg:        var(--color-yellow-soft);
+  --btn-soft-fg:        var(--color-yellow-hover);
+  --btn-soft-hover:     var(--color-yellow-soft-hover);
+  --btn-border:         var(--color-yellow);
+  --btn-text:           var(--color-yellow-hover);
+}
+
+.button-color-green {
+  --btn-solid-bg:       var(--color-green);
+  --btn-solid-fg:       var(--color-green-fg);
+  --btn-solid-hover:    var(--color-green-hover);
+  --btn-soft-bg:        var(--color-green-soft);
+  --btn-soft-fg:        var(--color-green-hover);
+  --btn-soft-hover:     var(--color-green-soft-hover);
+  --btn-border:         var(--color-green);
+  --btn-text:           var(--color-green-hover);
+}
+
+/* ─── Styles ───────────────────────────────────────────────────────────── */
+
+.button-fill {
+  background-color: var(--btn-solid-bg);
+  color: var(--btn-solid-fg);
+}
+
+.button-fill:hover {
+  background-color: var(--btn-solid-hover);
+}
+
+.button-smooth {
+  background-color: var(--btn-soft-bg);
+  color: var(--btn-soft-fg);
+}
+
+.button-smooth:hover {
+  background-color: var(--btn-soft-hover);
+}
+
+.button-outline {
+  background-color: transparent;
+  color: var(--btn-text);
+  border: 1px solid var(--btn-border);
+}
+
+.button-outline:hover {
+  background-color: var(--btn-soft-bg);
+  color: var(--btn-soft-fg);
+}
+
+.button-ghost {
+  background-color: transparent;
+  color: var(--btn-text);
+}
+
+.button-ghost:hover {
+  background-color: var(--btn-soft-bg);
+  color: var(--btn-soft-fg);
+}
+
+.button-link {
+  background-color: transparent;
+  color: var(--btn-text);
+  text-underline-offset: 4px;
+  padding: 0;
+  height: auto;
+}
+
+.button-link:hover {
+  text-decoration: underline;
+}
+
+/* ─── Sizes ────────────────────────────────────────────────────────────── */
+
+.button-size-sm {
+  height: var(--height-sm);
+  border-radius: var(--radius);
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.button-size-md {
+  height: var(--height-md);
+  padding: 0 1rem;
+}
+
+.button-size-lg {
+  height: var(--height-lg);
+  border-radius: var(--radius-md);
+  padding: 0 2rem;
+  font-size: 1rem;
+}
+
+.button-size-icon {
+  height: var(--height-sm);
+  width: var(--height-sm);
+  padding: 0;
+}
+
+.button-size-fill {
+  height: 100%;
+  border-radius: var(--radius);
+}
+
+/* ─── Util ─────────────────────────────────────────────────────────────── */
+
+.button-square {
+  aspect-ratio: 1;
+}

@@ -1,0 +1,132 @@
+table {
+  border-collapse: collapse;
+  table-layout: auto;
+  width: 100%;
+  min-width: 100%;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  caption-side: bottom;
+}
+
+thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-secondary);
+}
+
+thead tr {
+  height: 2.5rem;
+  text-align: left;
+}
+
+th {
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  color: var(--color-muted-fg);
+  white-space: nowrap;
+  user-select: none;
+}
+
+tbody tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: color, background-color, border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+tbody tr:last-child {
+  border-bottom: none;
+}
+
+tbody tr:nth-child(even) {
+  background-color: color-mix(in srgb, var(--color-secondary) 30%, transparent);
+}
+
+tbody tr:hover {
+  background-color: color-mix(in srgb, var(--color-secondary) 50%, transparent);
+}
+
+tbody tr[data-selected] {
+  background-color: var(--color-secondary);
+}
+
+tbody tr td[colspan] {
+  padding: 1rem 0.75rem;
+  text-align: center;
+  color: var(--color-muted-fg);
+}
+
+tbody tr.error td[colspan] {
+  color: var(--color-red);
+}
+
+td {
+  font-size: 0.75rem;
+  padding: 0.4rem 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  white-space: nowrap;
+}
+
+.status-pill::before {
+  content: "";
+  display: block;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.status-pill[data-status="active"] {
+  background-color: var(--color-green-soft);
+  color: var(--color-green-hover);
+}
+.status-pill[data-status="active"]::before {
+  background-color: var(--color-green);
+}
+
+.status-pill[data-status="inactive"],
+.status-pill[data-status="terminated"] {
+  background-color: var(--color-red-soft);
+  color: var(--color-red-hover);
+}
+.status-pill[data-status="inactive"]::before,
+.status-pill[data-status="terminated"]::before {
+  background-color: var(--color-red);
+}
+
+.status-pill[data-status="on-leave"],
+.status-pill[data-status="pending"] {
+  background-color: var(--color-yellow-soft);
+  color: var(--color-yellow-hover);
+}
+.status-pill[data-status="on-leave"]::before,
+.status-pill[data-status="pending"]::before {
+  background-color: var(--color-yellow);
+}
+
+.status-pill[data-status="unknown"] {
+  background-color: var(--color-secondary);
+  color: var(--color-muted-fg);
+}
+.status-pill[data-status="unknown"]::before {
+  background-color: var(--color-muted-fg);
+}

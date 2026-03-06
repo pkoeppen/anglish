@@ -1,0 +1,60 @@
+:root {
+  /* Background / surface */
+  --color-background: #ffffff;
+  --color-surface: #f8fafc;
+
+  /* Foreground / text */
+  --color-foreground: #0f172a;
+  --color-muted-fg: #94a3b8;
+
+  /* Primary */
+  --color-primary: #0f172a;
+  --color-primary-fg: #f8fafc;
+  --color-primary-hover: #1e293b;
+
+  /* Secondary */
+  --color-secondary: #f1f5f9;
+  --color-secondary-fg: #0f172a;
+  --color-secondary-hover: #e2e8f0;
+
+  /* Red */
+  --color-red: #ef4444;
+  --color-red-fg: #fef2f2;
+  --color-red-hover: #dc2626;
+  --color-red-soft: #fee2e2;
+  --color-red-soft-hover: #fecaca;
+
+  /* Yellow */
+  --color-yellow: #f59e0b;
+  --color-yellow-fg: #fffbeb;
+  --color-yellow-hover: #d97706;
+  --color-yellow-soft: #fef3c7;
+  --color-yellow-soft-hover: #fde68a;
+
+  /* Green */
+  --color-green: #22c55e;
+  --color-green-fg: #f0fdf4;
+  --color-green-hover: #16a34a;
+  --color-green-soft: #dcfce7;
+  --color-green-soft-hover: #bbf7d0;
+
+  /* Border */
+  --color-border: #e2e8f0;
+
+  /* Focus ring */
+  --color-ring: #3b82f6;
+  --color-ring-offset: #ffffff;
+
+  /* Control heights */
+  --height-sm: 2.25rem;
+  --height-md: 2.5rem;
+  --height-lg: 2.75rem;
+  --height-icon-sm: 1rem;
+
+  /* Border radius */
+  --radius: 0.25rem;
+  --radius-md: 0.375rem;
+
+  /* Transitions */
+  --transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
