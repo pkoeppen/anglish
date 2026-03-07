@@ -21,20 +21,7 @@ export class DatabaseClient {
     this.pool = new pg.Pool(config);
 
     const dialect = new PostgresDialect({ pool: this.pool });
-    const kyselyConfig: KyselyConfig = {
-      dialect,
-      log: (event: LogEvent) => {
-        if (event.level !== "query")
-          return;
-        const sqlText = event.query.sql.replace(/\s+/g, " ");
-        logger.debug(
-          `${sqlText}`.gray
-          + (event.query.parameters?.length
-            ? ` <- `.black + `${JSON.stringify(event.query.parameters)}`.blue
-            : ""),
-        );
-      },
-    };
+    const kyselyConfig: KyselyConfig = { dialect };
 
     initParsers();
 

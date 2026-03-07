@@ -16,7 +16,7 @@ export async function getStaticPaths() {
 
   return lemmas.map(lemma => ({
     params: { lemma: slugify(lemma.lemma) },
-    props: { lemmaId: lemma.id, headword: lemma },
+    props: { lemmaId: lemma.id, headword: lemma.lemma },
   }));
 }
 

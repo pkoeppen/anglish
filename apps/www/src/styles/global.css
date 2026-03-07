@@ -4,5 +4,5 @@
   --spacing-nav: 44px;
   --font-sans: var(--font-roboto);
   --font-serif: var(--font-faustina);
-  --font-display: var(--font-unifraktur);
+  --font-display: "Germania One", serif;
 }

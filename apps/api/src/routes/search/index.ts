@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import { vectorSearchHNSW } from "@anglish/db";
 
+const RESULTS_LENGTH = 10;
+
 const search: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
   fastify.get<{
     Querystring: { q?: string; pos?: string; k?: string };
@@ -26,8 +28,19 @@ const search: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
     const limit = k ? Math.min(Math.max(1, Number.parseInt(k, 10)), 100) : 20;
 
     try {
-      const results = await vectorSearchHNSW(q.trim(), pos, limit);
-      return { results };
+      const data = await vectorSearchHNSW(q.trim(), pos, limit);
+      const lemmas = new Set<string>();
+
+      main: for (let i = 0; i < data.length; i++) {
+        const { members } = (data as any)[i][0];
+        for (const member of members) {
+          lemmas.add(member);
+          if (lemmas.size >= RESULTS_LENGTH) {
+            break main;
+          }
+        }
+      }
+      return Array.from(lemmas);
     }
     catch (err) {
       request.log.error(err);

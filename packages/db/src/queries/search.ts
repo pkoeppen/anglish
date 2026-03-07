@@ -12,11 +12,7 @@ interface VectorSearchResult {
   score: number;
 }
 
-export async function vectorSearchHNSW(
-  text: string,
-  pos?: string,
-  k = 20,
-): Promise<VectorSearchResult[]> {
+export async function vectorSearchHNSW(text: string, pos?: string, k = 20) {
   const embedding = await createEmbedding(text);
   const filter = pos ? `@pos:{${pos}} ` : "*";
   const query = `${filter}=>[KNN ${k} @embedding $query_vector AS score]`;
@@ -43,24 +39,6 @@ export async function vectorSearchHNSW(
     pipeline.json.get(key, { path: "$" });
   }
 
-  const dataResults = await pipeline.exec();
-
-  console.log(dataResults);
-  // console.log(JSON.stringify(dataResults, null, 2));
-
-  const RESULTS_LENGTH = 10;
-  const results = new Set<string>();
-  main: for (let i = 0; i < dataResults.length; i++) {
-    const { pos, members } = (dataResults as any)[i][0];
-    for (const member of members) {
-      results.add(member);
-      if (results.size >= RESULTS_LENGTH) {
-        break main;
-      }
-    }
-  }
-
-  console.log(results);
-
-  return [] as any;
+  const data = await pipeline.exec();
+  return data as unknown as VectorSearchResult[][];
 }
