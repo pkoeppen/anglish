@@ -16,6 +16,9 @@
     }
   },
   "files": ["dist"],
+  "scripts": {
+    "build": "./scripts/build.sh"
+  },
   "devDependencies": {
     "colors": "1.4.0",
     "winston": "^3.19.0"

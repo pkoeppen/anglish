@@ -45,6 +45,9 @@ export async function vectorSearchHNSW(
 
   const dataResults = await pipeline.exec();
 
+  console.log(dataResults);
+  // console.log(JSON.stringify(dataResults, null, 2));
+
   const RESULTS_LENGTH = 10;
   const results = new Set<string>();
   main: for (let i = 0; i < dataResults.length; i++) {

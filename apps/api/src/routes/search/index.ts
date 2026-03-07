@@ -4,7 +4,7 @@ import { vectorSearchHNSW } from "@anglish/db";
 const search: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
   fastify.get<{
     Querystring: { q?: string; pos?: string; k?: string };
-  }>("/", async (request, reply) => {
+  }>("/search", async (request, reply) => {
     const { q, pos, k } = request.query;
 
     if (!q?.trim()) {

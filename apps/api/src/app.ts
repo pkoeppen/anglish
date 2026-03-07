@@ -1,40 +1,16 @@
-import type { AutoloadPluginOptions } from "@fastify/autoload";
 import type { FastifyPluginAsync, FastifyServerOptions } from "fastify";
-import { join } from "node:path";
-import AutoLoad from "@fastify/autoload";
 
-export interface AppOptions extends FastifyServerOptions, Partial<AutoloadPluginOptions> {
+import corsPlugin from "./plugins/cors";
+import sensiblePlugin from "./plugins/sensible";
+import searchRoutes from "./routes/search";
 
-}
-// Pass --options via CLI arguments in command to enable these options.
-const options: AppOptions = {
-};
-
-const app: FastifyPluginAsync<AppOptions> = async (
+const app: FastifyPluginAsync<FastifyServerOptions> = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
-  // Place here your custom code!
-
-  // Do not touch the following lines
-
-  // This loads all plugins defined in plugins
-  // those should be support plugins that are reused
-  // through your application
-
-  void fastify.register(AutoLoad, {
-    dir: join(import.meta.dirname, "plugins"),
-    options: opts,
-  });
-
-  // This loads all plugins defined in routes
-  // define your routes in one of these
-
-  void fastify.register(AutoLoad, {
-    dir: join(import.meta.dirname, "routes"),
-    options: opts,
-  });
+  await fastify.register(corsPlugin);
+  await fastify.register(sensiblePlugin);
+  await fastify.register(searchRoutes);
 };
 
 export default app;
-export { app, options };

@@ -6,22 +6,18 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "rollup -c"
+    "build": "./scripts/build.sh",
+    "build:watch": "./scripts/build.sh --watch"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^7.2.0",
     "@eslint/js": "^9.39.2",
-    "@rollup/plugin-alias": "^6.0.0",
-    "@rollup/plugin-commonjs": "^29.0.0",
-    "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^16.0.3",
-    "@trivago/prettier-plugin-sort-imports": "6.0.0",
     "@types/node": "20.19.27",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^9.2.1",
     "dotenv-cli": "11.0.0",
+    "esbuild": "0.27.3",
     "eslint": "9.39.2",
-    "rollup": "^4.59.0",
-    "rollup-plugin-dts": "^6.3.0",
-    "rollup-plugin-esbuild": "^6.2.1",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.53.1"
   },

@@ -1,5 +1,5 @@
 {
-  "name": "@collectivate/www",
+  "name": "@anglish/editor",
   "version": "0.0.0",
   "description": "",
   "type": "module",
@@ -20,7 +20,7 @@
     "vite-plugin-solid": "^2.11.8"
   },
   "dependencies": {
-    "@collectivate/api": "workspace:*",
+    "@anglish/api": "workspace:*",
     "@solidjs/router": "^0.15.1",
     "lucide-solid": "^0.577.0",
     "solid-js": "^1.9.11"

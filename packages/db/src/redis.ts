@@ -14,5 +14,5 @@ export const redis: RedisClientType = createClient({
 redis.on("error", error => console.error(`Redis: ${error}`));
 
 if (!redis.isOpen) {
-  await redis.connect();
+  redis.connect();
 }

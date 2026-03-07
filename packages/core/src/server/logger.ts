@@ -1,6 +1,7 @@
+import process from "node:process";
 import { createLogger, format, transports } from "winston";
 
-const logFormat = format.printf(function (info) {
+const logFormat = format.printf((info) => {
   return `${info.timestamp}-${info.level}: ${info.message}`;
 });
 
