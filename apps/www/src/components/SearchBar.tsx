@@ -1,5 +1,5 @@
+import type { Language } from "@anglish/core";
 import { slugify } from "@anglish/core";
-import { BookOpen, TrendingUp } from "lucide-solid";
 import { createEffect, createSignal, Match, onCleanup, Switch } from "solid-js";
 
 const DEBOUNCE_MS = 250;
@@ -19,7 +19,7 @@ const TRENDING_WORDS = [
 
 export default function SearchBar() {
   const [query, setQuery] = createSignal("");
-  const [results, setResults] = createSignal<string[]>([]);
+  const [results, setResults] = createSignal<{ lemma: string; lang: Language }[]>([]);
   const [showResults, setShowResults] = createSignal(false);
 
   async function runSearch(q: string) {
@@ -86,17 +86,15 @@ export default function SearchBar() {
               <Match when={panelState() === "trending"}>
                 <div class="py-2">
                   <div class="flex items-center gap-2 px-4 py-2 text-gray-500 text-xs font-medium uppercase tracking-wide">
-                    <TrendingUp size={14} />
                     Trending words
                   </div>
                   <ul class="py-1">
                     {TRENDING_WORDS.map(lemma => (
                       <li>
                         <a
-                          href={`/word/${slugify(String(lemma))}`}
+                          href={`/word/${slugify(lemma)}`}
                           class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 text-gray-900"
                         >
-                          <BookOpen size={16} class="text-gray-400 shrink-0" />
                           {lemma}
                         </a>
                       </li>
@@ -106,13 +104,15 @@ export default function SearchBar() {
               </Match>
               <Match when={panelState() === "results"}>
                 <ul class="py-1">
-                  {results().map(lemma => (
+                  {results().map(result => (
                     <li>
                       <a
-                        href={`/word/${slugify(String(lemma))}`}
+                        href={`/word/${slugify(result.lemma)}`}
                         class="block px-4 py-2 hover:bg-gray-100 text-gray-900"
                       >
-                        {lemma}
+                        {result.lemma}
+                        {" "}
+                        {result.lang}
                       </a>
                     </li>
                   ))}

@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { REDIS_SYNSET_HNSW_VSS_INDEX } from "../constants";
+import { REDIS_SYNSET_VSS_INDEX_FULL } from "../constants";
 import { createEmbedding } from "../lib";
 import { redis } from "../redis";
 
@@ -8,7 +8,6 @@ interface VectorSearchResult {
   pos: string;
   category: string;
   headword: string;
-  gloss?: string;
   score: number;
 }
 
@@ -19,9 +18,7 @@ export async function vectorSearchHNSW(text: string, pos?: string, k = 20) {
   const float32 = new Float32Array(embedding);
   const bytes = Buffer.from(float32.buffer, float32.byteOffset, float32.byteLength);
 
-  console.log("query:", query);
-
-  const vssResult = await redis.ft.search(REDIS_SYNSET_HNSW_VSS_INDEX, query, {
+  const vssResult = await redis.ft.search(REDIS_SYNSET_VSS_INDEX_FULL, query, {
     SORTBY: "score",
     RETURN: ["score", "pos"],
     DIALECT: 2,

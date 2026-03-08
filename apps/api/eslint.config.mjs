@@ -7,4 +7,7 @@ export default antfu({
     quotes: "double",
     semi: true,
   },
+  rules: {
+    "no-labels": "off",
+  },
 });

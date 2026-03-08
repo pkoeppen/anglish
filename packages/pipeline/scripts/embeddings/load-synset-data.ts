@@ -3,17 +3,15 @@ import type { RedisJSON } from "redis";
 import { open } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { redis, REDIS_SYNSET_DATA_PREFIX } from "@anglish/db";
+import { redis, REDIS_SYNSET_DATA_PREFIX_FULL, REDIS_SYNSET_DATA_PREFIX_WORDNET } from "@anglish/db";
 import { dataRoot } from "../../src/constants";
 
-async function loadSynsetData() {
-  const synsetDataFile = path.join(dataRoot, "anglish", "redis_synset_data.jsonl");
-
-  console.log(`Loading Redis synset data from ${synsetDataFile}`);
-
+async function loadSynsetData(filename: string, prefix: string) {
+  const synsetDataFile = path.join(dataRoot, "anglish", filename);
   const synsetDataStream = await open(synsetDataFile);
 
-  console.log(`Inserting synset data into Redis (${REDIS_SYNSET_DATA_PREFIX}*)...`);
+  console.log(`Loading synset data from ${synsetDataFile}`);
+  console.log(`Inserting synset data into Redis (${prefix}*)...`);
 
   let totalProcessed = 0;
   const BATCH_SIZE = 1000;
@@ -21,7 +19,7 @@ async function loadSynsetData() {
 
   const processBatch = async () => {
     await Promise.all(batch.map(async (synsetData) => {
-      const key = `${REDIS_SYNSET_DATA_PREFIX}${synsetData.synset_id}`;
+      const key = `${prefix}${synsetData.synset_id}`;
       return redis.json.set(key, "$", synsetData as unknown as RedisJSON);
     }));
     totalProcessed += batch.length;
@@ -45,7 +43,14 @@ async function loadSynsetData() {
 }
 
 async function main() {
-  await loadSynsetData();
+  const argv = process.argv.slice(2);
+  const flags = new Set(argv);
+  if (flags.has("--wordnet")) {
+    await loadSynsetData("redis_synset_data_wordnet.jsonl", REDIS_SYNSET_DATA_PREFIX_WORDNET);
+  }
+  if (flags.has("--full")) {
+    await loadSynsetData("redis_synset_data_full.jsonl", REDIS_SYNSET_DATA_PREFIX_FULL);
+  }
 }
 
 main().then(() => {

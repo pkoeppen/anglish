@@ -5,7 +5,7 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
 import { Language, WordnetPOS } from "@anglish/core";
-import { createEmbedding, db, redis, REDIS_SYNSET_FLAT_VSS_INDEX } from "@anglish/db";
+import { createEmbedding, db, redis, REDIS_SYNSET_VSS_INDEX_WORDNET } from "@anglish/db";
 import { makeLimiter, readJsonl } from "../lib/util";
 
 export interface MapStageConfig {
@@ -114,7 +114,7 @@ async function vectorSearch(text: string, pos: WordnetPOS, k = 20): Promise<Vect
   const float32 = new Float32Array(embedding);
   const bytes = Buffer.from(float32.buffer);
 
-  const results = await redis.ft.search(REDIS_SYNSET_FLAT_VSS_INDEX, query, {
+  const results = await redis.ft.search(REDIS_SYNSET_VSS_INDEX_WORDNET, query, {
     SORTBY: "score",
     RETURN: ["score", "pos"],
     DIALECT: 2,

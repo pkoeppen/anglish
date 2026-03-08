@@ -17,9 +17,11 @@
     "dev": "dotenv -e ../../.env -- node --watch dist/server.js"
   },
   "dependencies": {
+    "@anglish/core": "workspace:*",
     "@anglish/db": "workspace:*",
     "@fastify/cors": "^11.2.0",
     "@fastify/sensible": "^6.0.0",
+    "compromise": "^14.15.0",
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.0.0"
   },

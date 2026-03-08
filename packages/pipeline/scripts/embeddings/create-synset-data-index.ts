@@ -1,41 +1,15 @@
 import process from "node:process";
 import {
   redis,
-  REDIS_SYNSET_DATA_PREFIX,
-  REDIS_SYNSET_FLAT_VSS_INDEX,
-  REDIS_SYNSET_HNSW_VSS_INDEX,
+  REDIS_SYNSET_DATA_PREFIX_FULL,
+  REDIS_SYNSET_DATA_PREFIX_WORDNET,
+  REDIS_SYNSET_VSS_INDEX_FULL,
+  REDIS_SYNSET_VSS_INDEX_WORDNET,
 } from "@anglish/db";
 import { SCHEMA_FIELD_TYPE } from "redis";
 
-async function createSynsetSearchIndex() {
-  const key = REDIS_SYNSET_HNSW_VSS_INDEX;
-
-  await dropIndex(key);
-
-  process.stdout.write(`Creating index ${key}...`);
-  await redis.ft.create(key, {
-    "$.pos": { type: SCHEMA_FIELD_TYPE.TAG, AS: "pos" },
-    "$.embedding": {
-      type: SCHEMA_FIELD_TYPE.VECTOR,
-      AS: "embedding",
-      ALGORITHM: "HNSW",
-      TYPE: "FLOAT32",
-      DIM: 3072,
-      DISTANCE_METRIC: "COSINE",
-      INITIAL_CAP: 110_000,
-      M: 16,
-      EF_CONSTRUCTION: 200,
-    },
-  }, {
-    ON: "JSON",
-    PREFIX: REDIS_SYNSET_DATA_PREFIX,
-  });
-
-  process.stdout.write(" Done\n");
-}
-
-async function createSynsetDataIndex() {
-  const key = REDIS_SYNSET_FLAT_VSS_INDEX;
+async function createSynsetIndexWordnet() {
+  const key = REDIS_SYNSET_VSS_INDEX_WORDNET;
 
   await dropIndex(key);
 
@@ -53,7 +27,35 @@ async function createSynsetDataIndex() {
     },
   }, {
     ON: "JSON",
-    PREFIX: REDIS_SYNSET_DATA_PREFIX,
+    PREFIX: REDIS_SYNSET_DATA_PREFIX_WORDNET,
+  });
+
+  process.stdout.write(" Done\n");
+}
+
+async function createSynsetIndexFull() {
+  const key = REDIS_SYNSET_VSS_INDEX_FULL;
+
+  await dropIndex(key);
+
+  process.stdout.write(`Creating index ${key}...`);
+  await redis.ft.create(key, {
+    "$.pos": { type: SCHEMA_FIELD_TYPE.TAG, AS: "pos" },
+    "$.lang": { type: SCHEMA_FIELD_TYPE.TAG, AS: "lang" },
+    "$.embedding": {
+      type: SCHEMA_FIELD_TYPE.VECTOR,
+      AS: "embedding",
+      ALGORITHM: "HNSW",
+      TYPE: "FLOAT32",
+      DIM: 3072,
+      DISTANCE_METRIC: "COSINE",
+      INITIAL_CAP: 110_000,
+      M: 16,
+      EF_CONSTRUCTION: 200,
+    },
+  }, {
+    ON: "JSON",
+    PREFIX: REDIS_SYNSET_DATA_PREFIX_FULL,
   });
 
   process.stdout.write(" Done\n");
@@ -74,12 +76,15 @@ async function dropIndex(key: string) {
 async function main() {
   const argv = process.argv.slice(2);
   const flags = new Set(argv);
-
   if (flags.has("--flush")) {
     await flushAll();
   }
-  await createSynsetDataIndex();
-  await createSynsetSearchIndex();
+  if (flags.has("--wordnet")) {
+    await createSynsetIndexWordnet();
+  }
+  if (flags.has("--full")) {
+    await createSynsetIndexFull();
+  }
 }
 
 main().then(() => {

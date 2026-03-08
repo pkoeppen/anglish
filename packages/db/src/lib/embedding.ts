@@ -1,3 +1,4 @@
+import { logger } from "@anglish/core/server";
 import OpenAI from "openai";
 import "colors";
 
@@ -8,6 +9,8 @@ export async function createEmbedding(text: string) {
     model: "text-embedding-3-large",
     input: [text],
   });
-  console.log(`GPT: Created embedding for "${text}"`.blue);
+
+  logger.info(`GPT: Created embedding for "${text}"`.blue);
+
   return response.data[0].embedding;
 }
