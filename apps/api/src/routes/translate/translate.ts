@@ -1,20 +1,13 @@
-import { Language, WordnetPOS } from "@anglish/core";
+import type { Term } from "compromise/misc";
+import { combineEmbeddings, Language, makeLimiter, WordnetPOS } from "@anglish/core";
 import { logger } from "@anglish/core/server";
-import { vectorSearchHNSW } from "@anglish/db";
+import { createEmbedding, redis, REDIS_LEMMA_DATA_PREFIX, vectorSearchByEmbedding } from "@anglish/db";
 import compromise from "compromise";
 import { SKIP_WORDS } from "./constants";
 
-interface InputTerm {
-  key: string | null;
-  text: string;
-  pre: string;
-  post: string;
-  pos: WordnetPOS | null;
-}
-
 interface OutputTerm {
   didTranslate: boolean;
-  normalized: string;
+  normal: string;
   pos: WordnetPOS | null;
   text: string;
   pre: string;
@@ -23,197 +16,106 @@ interface OutputTerm {
   synonyms: string[];
 }
 
-interface TranslationCache {
-  [key: string]: { // lemma:pos
-    lemma: string; // lemma of the input word
-    pos: WordnetPOS;
-    synonyms?: string[]; // anglish synonyms
-    isAnglish?: boolean; // whether the lemma is anglish
-    forms: Record<string, {
-      restoreFn?: (lemma: string) => string; // restores word to its original form
-    }>;
-  };
-}
-
 export async function translateText(input: string, excludePOS: Set<WordnetPOS>) {
-  const cache: TranslationCache = {};
-  const inputTerms: InputTerm[] = [];
-  const sentences = compromise(input).json() as {
-    text: string;
-    terms: {
-      text: string;
-      pre: string;
-      post: string;
-      tags: string[];
-      normal: string;
-      index: [number, number];
-      id: string;
-      dirty: boolean;
-      chunk: string;
-    }[];
-  }[];
+  const terms = compromise(input).terms().termList();
+  const output: OutputTerm[] = [];
+  const pipeline = redis.multi();
+  const run = makeLimiter(30, 4500);
+  const promises = [];
 
-  for (const sentence of sentences) {
-    for (const term of sentence.terms) {
-      const pos = tagsToPOS(term.tags);
-      const { lemma, restoreFn } = getLemma(term.normal);
-      const willTranslate = pos !== null && !excludePOS?.has(pos) && !SKIP_WORDS.has(lemma);
-
-      logger.debug(`"${term.normal}": ${willTranslate ? "translate" : "skip"}`);
-
-      const key = `${lemma}:${pos}`;
-      const inputTerm: InputTerm = {
-        key: willTranslate ? key : null,
-        text: term.text,
-        pre: term.pre,
-        post: term.post,
-        pos,
-      };
-
-      if (willTranslate) {
-        if (!cache[key]) {
-          cache[key] = { lemma, pos, forms: {} };
-        }
-        if (!cache[key].forms[term.normal]) {
-          cache[key].forms[term.normal] = { restoreFn };
-        }
-      }
-
-      inputTerms.push(inputTerm);
-    }
-  }
-
-  if (!Object.keys(cache).length) {
-    return;
-  }
-
-  for (const { lemma, pos } of Object.values(cache)) {
-    const synonyms = new Set<string>();
-    const data = await vectorSearchHNSW(lemma, pos); // TODO: Create an index on lemma:<lemma>:<pos> with a synset embedding on it
-    main: for (let i = 0; i < data.length; i++) {
-      const { members } = (data as any)[i][0];
-      for (const member of members) {
-        if (member.lang === Language.Anglish) {
-          synonyms.add(member);
-        }
-        if (synonyms.size >= 10) {
-          break main;
-        }
-      }
-      console.log("looping");
-    }
-    console.log(lemma, pos, synonyms);
-  }
-
-  // const synonymData = await db
-  //   .with("data", eb =>
-  //     eb
-  //       .selectFrom("entry")
-  //       .innerJoin("sense", "entry.id", "sense.entry_id")
-  //       .innerJoin("synset", "sense.synset_id", "synset.id")
-  //       .select(["entry.word", "entry.pos", "entry.is_anglish", "synset.id as synset_id"])
-  //       .where("entry.word", "in", Array.from(lemmas)))
-  //   .selectFrom("entry")
-  //   .innerJoin("sense", "entry.id", "sense.entry_id")
-  //   .innerJoin("synset", "sense.synset_id", "synset.id")
-  //   .innerJoin("data", "synset.id", "data.synset_id")
-  //   .select([
-  //     "data.word",
-  //     sql<WordnetPOS>`data.pos`.as("pos"),
-  //     "data.is_anglish",
-  //     sql<{ word: string; frequency: number }[] | null>`
-  //       array_agg(
-  //         DISTINCT json_build_object('word', entry.word, 'frequency', entry.frequency)::jsonb
-  //       )
-  //     `.as("anglish_synonyms"),
-  //   ])
-  //   .where("entry.word", "not in", lemmas)
-  //   .where("entry.is_anglish", "=", true)
-  //   .groupBy(["data.word", "data.pos", "data.is_anglish"])
-  //   .execute();
-
-  // for (const data of synonymData) {
-  //   const entry = cache[`${data.word}:${data.pos}`];
-  //   if (entry) {
-  //     entry.isAnglish = data.is_anglish;
-  //     if (data.anglish_synonyms) {
-  //       entry.synonyms = data.anglish_synonyms
-  //         .sort((a: { frequency: number }, b: { frequency: number }) => b.frequency - a.frequency)
-  //         .map(({ word: lemma }: { word: string }) => {
-  //           const restored = entry.restoreFn?.(lemma) || lemma;
-  //           if (restored !== lemma) {
-  //             logger.debug(`Restored Anglish lemma "${lemma}" to "${restored}"`);
-  //           }
-  //           return restored;
-  //         });
-  //     }
-  //   }
-  // }
-
-  const outputTerms: OutputTerm[] = inputTerms.map((inputTerm) => {
+  for (let i = 0; i < terms.length; i++) {
+    const term = terms[i];
+    const { lemma, restoreFn } = getLemma(term);
+    const pos = tagsToPOS(term.tags);
+    const willTranslate = !!lemma && !!pos && !excludePOS?.has(pos) && !SKIP_WORDS.has(lemma);
     const outputTerm: OutputTerm = {
-      didTranslate: inputTerm.key !== null,
-      normalized: inputTerm.text,
-      pos: inputTerm.pos,
-      text: inputTerm.text,
-      pre: inputTerm.pre,
-      post: inputTerm.post,
+      normal: term.normal,
+      text: term.text,
+      pre: term.pre,
+      post: term.post,
+      pos,
       isAnglish: false,
       synonyms: [],
+      didTranslate: willTranslate,
     };
+    output.push(outputTerm);
 
-    if (inputTerm.key) {
-      const entry = cache[inputTerm.key];
-      outputTerm.isAnglish = entry.isAnglish || false;
-      outputTerm.synonyms = entry.synonyms || [];
+    const key = `${REDIS_LEMMA_DATA_PREFIX}${lemma}:${pos}`;
+    pipeline.json.get(key, { path: ["$.lang"] });
+
+    if (willTranslate) {
+      promises.push(
+        run(async () => {
+          // Fetch Anglish synonyms with Redis VSS.
+          const context = getContextWindow(terms, i);
+          const [wordEmbedding, contextEmbedding] = await Promise.all([
+            createEmbedding(lemma),
+            createEmbedding(context),
+          ]);
+          const queryEmbedding = combineEmbeddings([
+            { embedding: wordEmbedding, weight: 0.85 },
+            { embedding: contextEmbedding, weight: 0.15 },
+          ]);
+          const filters = {
+            lemma: { text: lemma, exclude: true },
+            pos: { text: pos },
+            lang: { text: Language.Anglish },
+          };
+          const results = await vectorSearchByEmbedding(queryEmbedding, filters);
+          const synonyms = results.map(r => restoreFn?.(r.lemma) ?? r.lemma);
+          outputTerm.synonyms = synonyms;
+        }),
+      );
     }
+  }
 
-    if (outputTerm.isAnglish) {
-      outputTerm.synonyms.unshift(outputTerm.text);
-    }
+  promises.unshift(pipeline.exec());
+  const resolved = await Promise.all(promises);
+  const pipelineResults = resolved[0] as unknown as (string[] | null)[];
+  for (let i = 0; i < pipelineResults.length; i++) {
+    const lang = pipelineResults[i]?.[0];
+    output[i].isAnglish = lang === Language.Anglish;
+  }
 
-    return outputTerm;
-  });
-
-  return outputTerms;
+  return output;
 }
 
-function tagsToPOS(tags: string[]): WordnetPOS | null {
-  if (!tags.length) {
+function tagsToPOS(tags: Set<string> | undefined): WordnetPOS | null {
+  if (!tags?.size) {
     throw new Error("Missing tags");
   }
-
-  if (tags.includes("Noun")) {
+  if (tags.has("Noun")) {
     return WordnetPOS.Noun;
   }
-  if (tags.includes("Verb")) {
+  if (tags.has("Verb")) {
     return WordnetPOS.Verb;
   }
-  if (tags.includes("Adjective")) {
+  if (tags.has("Adjective")) {
     return WordnetPOS.Adjective;
   }
-  if (tags.includes("Adverb")) {
+  if (tags.has("Adverb")) {
     return WordnetPOS.Adverb;
   }
-
   return null;
 }
 
-function getLemma(term: string): { lemma: string; restoreFn?: (lemma: string) => string } {
-  const termDoc = compromise(term);
-
-  if (termDoc.has("#Noun") && termDoc.has("#Plural")) {
-    return getLemmaFromPlural(termDoc, term);
+function getLemma(term: Term): { lemma: string; restoreFn?: (lemma: string) => string } {
+  if (term.tags?.has("Noun")) {
+    if (term.tags.has("Plural")) {
+      return getLemmaFromPlural(term);
+    }
+    if (term.tags.has("Possessive")) {
+      return getLemmaFromPossessive(term);
+    }
   }
-  if (termDoc.has("#Verb")) {
-    return getLemmaFromVerb(termDoc, term);
+  if (term.tags?.has("Verb")) {
+    return getLemmaFromVerb(term);
   }
-
-  return { lemma: term };
+  return { lemma: term.normal };
 }
 
-function getLemmaFromPlural(termDoc: ReturnType<typeof compromise>, term: string) {
-  const doc = termDoc.nouns().toSingular();
+function getLemmaFromPlural(term: Term) {
+  const doc = compromise(term.normal).nouns().toSingular();
   const lemma = doc.out();
 
   logger.debug(`Converting "${term}" to "${lemma}"`);
@@ -224,32 +126,43 @@ function getLemmaFromPlural(termDoc: ReturnType<typeof compromise>, term: string
   };
 }
 
-function getLemmaFromVerb(termDoc: ReturnType<typeof compromise>, term: string) {
-  const out: Record<string, string[]>[] = termDoc.out("tags");
-  const tags = out[0][term];
-  const infinitive: string = termDoc.verbs().toInfinitive().out();
+function getLemmaFromPossessive(term: Term) {
+  const doc = compromise(term.normal).possessives().strip();
+  const lemma = doc.out();
 
-  if (term === infinitive) {
+  logger.debug(`Converting "${term}" to "${lemma}"`);
+
+  return {
+    lemma,
+    restoreFn: restoreLemmaToPossessive,
+  };
+}
+
+function getLemmaFromVerb(term: Term) {
+  const doc = compromise(term.normal);
+  const infinitive: string = doc.verbs().toInfinitive().out();
+
+  if (term.normal === infinitive) {
     return { lemma: infinitive };
   }
 
-  logger.debug(`Converting "${term}" to "${infinitive}"`);
+  logger.debug(`Converting "${term.normal}" to "${infinitive}"`);
 
   let restoreFn: ((lemma: string) => string) | undefined;
 
   // TODO: Implement more sophisticated conjugation logic for Anglish words not known to Compromise compromise
-  if (tags?.includes("Gerund")) {
+  if (term.tags?.has("Gerund")) {
     // The order is important here; "Gerund" must be checked first,
     // because "Gerund" and "PresentTense" always occur together.
     restoreFn = restoreLemmaToGerund;
   }
-  else if (tags?.includes("PresentTense")) {
+  else if (term.tags?.has("PresentTense")) {
     restoreFn = restoreLemmaToPresentTense;
   }
-  else if (tags?.includes("PastTense")) {
+  else if (term.tags?.has("PastTense")) {
     restoreFn = restoreLemmaToPastTense;
   }
-  else if (tags?.includes("FutureTense")) {
+  else if (term.tags?.has("FutureTense")) {
     restoreFn = restoreLemmaToFutureTense;
   }
 
@@ -270,6 +183,11 @@ function restoreLemmaToPlural(lemma: string): string {
     }
   }
   return restored || lemma;
+}
+
+function restoreLemmaToPossessive(lemma: string): string {
+  const restored = `${lemma}'s`;
+  return restored;
 }
 
 function restoreLemmaToGerund(lemma: string): string {
@@ -309,4 +227,13 @@ function restoreLemmaToPastTense(lemma: string): string {
 function restoreLemmaToFutureTense(lemma: string): string {
   const restored = compromise(lemma).verbs().toFutureTense().out();
   return restored || `will ${lemma}`;
+}
+
+function getContextWindow(terms: Term[], index: number, radius = 10) {
+  const start = Math.max(0, index - radius);
+  const end = Math.min(terms.length, index + radius + 1);
+  return terms
+    .slice(start, end)
+    .map(t => `${t.pre}${t.text}${t.post}`)
+    .join("");
 }

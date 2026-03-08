@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
-import { vectorSearchHNSW } from "@anglish/db";
+import { WordnetPOS } from "@anglish/core";
+import { vectorSearch } from "@anglish/db";
 
 const RESULTS_LENGTH = 10;
 
@@ -12,24 +13,16 @@ const search: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
     if (!q?.trim()) {
       return reply.code(400).send({ error: "Query parameter 'q' is required" });
     }
+    if (pos && !Object.values(WordnetPOS).includes(pos as WordnetPOS)) {
+      return reply.code(400).send({ error: "Invalid part of speech" });
+    }
 
-    const limit = k ? Math.min(Math.max(1, Number.parseInt(k, 10)), 100) : 20;
+    const limit = k ? Math.min(Math.max(1, Number.parseInt(k, 10)), 100) : RESULTS_LENGTH;
 
     try {
-      const data = await vectorSearchHNSW(q.trim(), pos, limit);
-      const lemmas = new Set<string>();
-
-      main: for (let i = 0; i < data.length; i++) {
-        const { members } = (data as any)[i][0];
-        for (const member of members) {
-          lemmas.add(member);
-          if (lemmas.size >= RESULTS_LENGTH) {
-            break main;
-          }
-        }
-      }
-      const arr = Array.from(lemmas);
-      return arr;
+      const filters = { pos: { text: pos as WordnetPOS } };
+      const results = await vectorSearch(q.trim(), filters, limit);
+      return results;
     }
     catch (err) {
       request.log.error(err);

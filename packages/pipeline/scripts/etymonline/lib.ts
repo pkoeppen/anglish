@@ -1,6 +1,6 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { dedent, WordnetPOS } from "@anglish/core";
+import { dedent, makeLimiter, WordnetPOS } from "@anglish/core";
 import { db } from "@anglish/db";
 import * as cheerio from "cheerio";
 import fetch from "node-fetch";
@@ -9,7 +9,6 @@ import Turndown from "turndown";
 import { dataRoot } from "../../src/constants";
 // import { awsProxyManager } from "../../../proxyswarm/lib/aws";
 // import { ProxySwarm } from "../../../proxyswarm/lib/swarm";
-import { makeLimiter } from "../../src/lib/util";
 import "colors";
 
 const client = new OpenAI();

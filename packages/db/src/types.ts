@@ -5,6 +5,13 @@ export interface RedisSynsetData {
   pos: WordnetPOS;
   category: string;
   headword: string;
-  members: (string | { lemma: string; lang: Language })[];
+  members: string[];
+  embedding: number[];
+}
+
+export interface RedisLemmaData {
+  lemma: string;
+  pos: WordnetPOS;
+  lang: Language;
   embedding: number[];
 }

@@ -3,10 +3,10 @@ import type { KaikkiEntry } from "../src/sources/kaikki/kaikki-types";
 import type { MergedRecord } from "../src/stages/04_merge";
 import path from "node:path";
 import process from "node:process";
-import { Language } from "@anglish/core";
+import { Language, makeLimiter } from "@anglish/core";
 import { db } from "@anglish/db";
 import { dataRoot } from "../src/constants";
-import { makeLimiter, readJsonl } from "../src/lib/util";
+import { readJsonl } from "../src/lib/util";
 import { isAnglish } from "../src/sources/kaikki/02_parse";
 import { normalizeKaikkiPOS } from "../src/sources/kaikki/03_normalize";
 

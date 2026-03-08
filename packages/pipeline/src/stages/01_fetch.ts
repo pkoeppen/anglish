@@ -4,8 +4,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { makeLimiter } from "@anglish/core";
 import * as cheerio from "cheerio";
-import { makeLimiter } from "../lib/util";
 import "colors";
 
 export interface FetchMetadata {

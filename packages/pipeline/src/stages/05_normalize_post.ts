@@ -4,9 +4,9 @@ import type { MergedRecord } from "./04_merge";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import { WordnetPOS } from "@anglish/core";
+import { makeLimiter, WordnetPOS } from "@anglish/core";
 import OpenAI from "openai";
-import { makeLimiter, readJsonl, wordnetReadablePOS } from "../lib/util";
+import { readJsonl, wordnetReadablePOS } from "../lib/util";
 import { getCategoriesByPOS } from "../lib/wordnet";
 
 const openai = new OpenAI();

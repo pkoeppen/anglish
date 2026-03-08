@@ -10,7 +10,7 @@ export async function createEmbedding(text: string) {
     input: [text],
   });
 
-  logger.info(`GPT: Created embedding for "${text}"`.blue);
+  logger.debug(`GPT: Created embedding for "${text}"`.blue);
 
   return response.data[0].embedding;
 }

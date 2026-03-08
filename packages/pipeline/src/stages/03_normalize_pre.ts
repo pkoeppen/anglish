@@ -5,7 +5,8 @@ import type { KaikkiSourceRecord } from "../sources/kaikki/02_parse";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import { makeLimiter, readJsonl } from "../lib/util";
+import { makeLimiter } from "@anglish/core";
+import { readJsonl } from "../lib/util";
 
 export interface NormalizeManifestRow {
   id: string;

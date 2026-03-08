@@ -1,15 +1,15 @@
 import process from "node:process";
 import {
   redis,
-  REDIS_SYNSET_DATA_PREFIX_FULL,
-  REDIS_SYNSET_DATA_PREFIX_WORDNET,
-  REDIS_SYNSET_VSS_INDEX_FULL,
-  REDIS_SYNSET_VSS_INDEX_WORDNET,
+  REDIS_LEMMA_DATA_PREFIX,
+  REDIS_LEMMA_VSS_INDEX,
+  REDIS_SYNSET_DATA_PREFIX,
+  REDIS_SYNSET_VSS_INDEX,
 } from "@anglish/db";
 import { SCHEMA_FIELD_TYPE } from "redis";
 
-async function createSynsetIndexWordnet() {
-  const key = REDIS_SYNSET_VSS_INDEX_WORDNET;
+async function createSynsetDataIndex() {
+  const key = REDIS_SYNSET_VSS_INDEX;
 
   await dropIndex(key);
 
@@ -27,19 +27,20 @@ async function createSynsetIndexWordnet() {
     },
   }, {
     ON: "JSON",
-    PREFIX: REDIS_SYNSET_DATA_PREFIX_WORDNET,
+    PREFIX: REDIS_SYNSET_DATA_PREFIX,
   });
 
   process.stdout.write(" Done\n");
 }
 
-async function createSynsetIndexFull() {
-  const key = REDIS_SYNSET_VSS_INDEX_FULL;
+async function createLemmaDataIndex() {
+  const key = REDIS_LEMMA_VSS_INDEX;
 
   await dropIndex(key);
 
   process.stdout.write(`Creating index ${key}...`);
   await redis.ft.create(key, {
+    "$.lemma": { type: SCHEMA_FIELD_TYPE.TAG, AS: "lemma" },
     "$.pos": { type: SCHEMA_FIELD_TYPE.TAG, AS: "pos" },
     "$.lang": { type: SCHEMA_FIELD_TYPE.TAG, AS: "lang" },
     "$.embedding": {
@@ -55,7 +56,7 @@ async function createSynsetIndexFull() {
     },
   }, {
     ON: "JSON",
-    PREFIX: REDIS_SYNSET_DATA_PREFIX_FULL,
+    PREFIX: REDIS_LEMMA_DATA_PREFIX,
   });
 
   process.stdout.write(" Done\n");
@@ -79,11 +80,11 @@ async function main() {
   if (flags.has("--flush")) {
     await flushAll();
   }
-  if (flags.has("--wordnet")) {
-    await createSynsetIndexWordnet();
+  if (flags.has("--synset")) {
+    await createSynsetDataIndex();
   }
-  if (flags.has("--full")) {
-    await createSynsetIndexFull();
+  if (flags.has("--lemma")) {
+    await createLemmaDataIndex();
   }
 }
 
