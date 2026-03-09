@@ -58,21 +58,17 @@ export async function wordSearch(
 
   /* eslint-disable antfu/consistent-list-newline */
   const result = await redis.sendCommand([
-    "FT.HYBRID", "idx",
+    "FT.HYBRID", REDIS_LEMMA_VSS_INDEX,
     "SEARCH", query,
     "YIELD_SCORE_AS", "text_score",
     "VSIM", "@embedding", "$vec",
     "KNN", "4", "K", String(k), "EF_RUNTIME", "100",
     "YIELD_SCORE_AS", "vector_score",
-    "COMBINE", "LINEAR", "4", "ALPHA", "0.85", "BETA", "0.15",
-    "YIELD_SCORE_AS", "hybrid_score",
-    "SORTBY", "2", "hybrid_score", "DESC",
+    "COMBINE", "LINEAR", "6", "ALPHA", "0.85", "BETA", "0.15", "YIELD_SCORE_AS", "hybrid_score",
+    "SORTBY", "2", "@hybrid_score", "DESC",
     "PARAMS", "2", "vec", bytes,
   ]);
   /* eslint-enable */
-
-  console.log("query:", query);
-  console.log("result:", result);
 
   const pipeline = redis.multi();
   for (const { id: key } of result as any) {
