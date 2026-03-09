@@ -12,5 +12,5 @@ export async function createEmbedding(text: string) {
 
   logger.debug(`GPT: Created embedding for "${text}"`.blue);
 
-  return response.data[0].embedding;
+  return Float32Array.from(response.data[0].embedding);
 }

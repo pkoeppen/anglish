@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { WordnetPOS } from "@anglish/core";
-import { vectorSearch } from "@anglish/db";
+import { wordSearch } from "@anglish/db";
 
 const RESULTS_LENGTH = 10;
 
@@ -21,7 +21,7 @@ const search: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
 
     try {
       const filters = { pos: { text: pos as WordnetPOS } };
-      const results = await vectorSearch(q.trim(), filters, limit);
+      const results = await wordSearch(q.trim(), filters, limit);
       return results;
     }
     catch (err) {

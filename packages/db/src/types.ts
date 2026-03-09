@@ -6,12 +6,16 @@ export interface RedisSynsetData {
   category: string;
   headword: string;
   members: string[];
-  embedding: number[];
+  embedding: Float32Array;
 }
 
 export interface RedisLemmaData {
+  lemma_id: number;
+  sense_id: number;
+  synset_id: string;
   lemma: string;
   pos: WordnetPOS;
   lang: Language;
-  embedding: number[];
+  gloss: string;
+  embedding: Float32Array;
 }

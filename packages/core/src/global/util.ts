@@ -1,6 +1,3 @@
-/**
- * Helper function to dedent multiline backtick strings.
- */
 export function dedent(strings: TemplateStringsArray, ...values: unknown[]) {
   const full = strings.reduce(
     (acc, s, i) => acc + s + (values[i] ?? ""),
@@ -112,10 +109,10 @@ export async function retry<T>(fn: () => Promise<T>, retries = 3, delay = 1000):
 }
 
 export function combineEmbeddings(
-  items: { embedding: number[]; weight: number }[],
-): number[] {
+  items: { embedding: Float32Array; weight: number }[],
+): Float32Array {
   const length = items[0].embedding.length;
-  const out = Array.from({ length }).fill(0) as number[];
+  const out = new Float32Array(length);
   for (const { embedding, weight } of items) {
     for (let i = 0; i < length; i++) {
       out[i] += embedding[i] * weight;

@@ -111,8 +111,7 @@ interface VectorSearchResult {
 async function vectorSearch(text: string, pos: WordnetPOS, k = 20): Promise<VectorSearchResult[]> {
   const embedding = await createEmbedding(text);
   const query = `@pos:{${pos}} =>[KNN ${k} @embedding $query_vector AS score]`;
-  const float32 = new Float32Array(embedding);
-  const bytes = Buffer.from(float32.buffer);
+  const bytes = Buffer.from(embedding.buffer);
 
   const results = await redis.ft.search(REDIS_SYNSET_VSS_INDEX, query, {
     SORTBY: "score",

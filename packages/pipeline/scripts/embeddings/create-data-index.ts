@@ -35,29 +35,34 @@ async function createSynsetDataIndex() {
 
 async function createLemmaDataIndex() {
   const key = REDIS_LEMMA_VSS_INDEX;
-
   await dropIndex(key);
 
   process.stdout.write(`Creating index ${key}...`);
-  await redis.ft.create(key, {
-    "$.lemma": { type: SCHEMA_FIELD_TYPE.TAG, AS: "lemma" },
-    "$.pos": { type: SCHEMA_FIELD_TYPE.TAG, AS: "pos" },
-    "$.lang": { type: SCHEMA_FIELD_TYPE.TAG, AS: "lang" },
-    "$.embedding": {
-      type: SCHEMA_FIELD_TYPE.VECTOR,
-      AS: "embedding",
-      ALGORITHM: "HNSW",
-      TYPE: "FLOAT32",
-      DIM: 3072,
-      DISTANCE_METRIC: "COSINE",
-      INITIAL_CAP: 110_000,
-      M: 16,
-      EF_CONSTRUCTION: 200,
-    },
-  }, {
-    ON: "JSON",
-    PREFIX: REDIS_LEMMA_DATA_PREFIX,
-  });
+
+  /* eslint-disable antfu/consistent-list-newline */
+
+  // This direct sendCommand() is necessary because we cannot otherwise
+  // set two field definitions on the same object property ("$.lemma").
+  await redis.sendCommand([
+    "FT.CREATE",
+    key,
+    "ON", "JSON",
+    "PREFIX", "1", REDIS_LEMMA_DATA_PREFIX,
+    "SCHEMA",
+    "$.lemma", "AS", "lemma_text", "TEXT",
+    "$.lemma", "AS", "lemma_tag", "TAG",
+    "$.pos", "AS", "pos", "TAG",
+    "$.lang", "AS", "lang", "TAG",
+    "$.embedding", "AS", "embedding",
+    "VECTOR", "HNSW", "12",
+    "TYPE", "FLOAT32",
+    "DIM", "3072",
+    "DISTANCE_METRIC", "COSINE",
+    "INITIAL_CAP", "110000",
+    "M", "16",
+    "EF_CONSTRUCTION", "200",
+  ]);
+  /* eslint-enable */
 
   process.stdout.write(" Done\n");
 }

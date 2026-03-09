@@ -1,7 +1,7 @@
 import type { Term } from "compromise/misc";
 import { combineEmbeddings, Language, makeLimiter, WordnetPOS } from "@anglish/core";
 import { logger } from "@anglish/core/server";
-import { createEmbedding, redis, REDIS_LEMMA_DATA_PREFIX, vectorSearchByEmbedding } from "@anglish/db";
+import { createEmbedding, redis, REDIS_LEMMA_DATA_PREFIX, translationSearch } from "@anglish/db";
 import compromise from "compromise";
 import { SKIP_WORDS } from "./constants";
 
@@ -61,7 +61,7 @@ export async function translateText(input: string, excludePOS: Set<WordnetPOS>) 
             pos: { text: pos },
             lang: { text: Language.Anglish },
           };
-          const results = await vectorSearchByEmbedding(queryEmbedding, filters);
+          const results = await translationSearch(queryEmbedding, filters);
           const synonyms = results.map(r => restoreFn?.(r.lemma) ?? r.lemma);
           outputTerm.synonyms = synonyms;
         }),

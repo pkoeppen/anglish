@@ -8,7 +8,7 @@ const logFormat = format.printf((info) => {
 const logger = createLogger({
   transports: [
     new transports.Console({
-      level: process.env.LOG_LEVEL || (process.env.NODE_ENV === "development" ? "debug" : "info"),
+      level: process.env.LOG_LEVEL || "info",
       format: format.combine(format.timestamp(), format.colorize(), logFormat),
     }),
   ],
