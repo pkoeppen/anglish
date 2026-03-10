@@ -99,7 +99,7 @@ export async function retry<T>(fn: () => Promise<T>, retries = 3, delay = 1000):
     return await fn();
   }
   catch (error) {
-    console.error(`Error: ${error}`.red);
+    console.error(`Retry: ${error}`.red);
     if (retries > 0) {
       sleep(delay);
       return await retry(fn, retries - 1);

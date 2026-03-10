@@ -1,8 +1,23 @@
 import type { Language, WordnetPOS } from "@anglish/core";
 import { Buffer } from "node:buffer";
+import { logger } from "@anglish/core/server";
 import { REDIS_LEMMA_VSS_INDEX } from "../constants";
 import { createEmbedding } from "../lib";
 import { redis } from "../redis";
+
+/* eslint-disable antfu/consistent-list-newline */
+type RedisHybridSearchResult = [
+  "total_results", number,
+  "results", [
+    "text_score", string,
+    "__key", string,
+    "vector_score", string,
+    "hybrid_score", string,
+  ][],
+  "warnings", string[],
+  "execution_time", string,
+];
+/* eslint-enable */
 
 interface Filter<T> {
   text: T;
@@ -54,10 +69,9 @@ export async function wordSearch(
     queryParts.push(optionalArr.join(" "));
   }
 
-  const query = queryParts.length ? queryParts.join(" ") : "*";
-
   /* eslint-disable antfu/consistent-list-newline */
-  const result = await redis.sendCommand([
+  const query = queryParts.length ? queryParts.join(" ") : "*";
+  const command = [
     "FT.HYBRID", REDIS_LEMMA_VSS_INDEX,
     "SEARCH", query,
     "YIELD_SCORE_AS", "text_score",
@@ -67,19 +81,25 @@ export async function wordSearch(
     "COMBINE", "LINEAR", "6", "ALPHA", "0.85", "BETA", "0.15", "YIELD_SCORE_AS", "hybrid_score",
     "SORTBY", "2", "@hybrid_score", "DESC",
     "PARAMS", "2", "vec", bytes,
-  ]);
+  ];
   /* eslint-enable */
 
+  const result = await redis.sendCommand(command) as RedisHybridSearchResult;
+  const [,total_results,,results,,_warnings,,execution_time] = result;
+
+  logger.debug(`Found ${total_results} results for "${text}" (${execution_time} ms)`);
+
   const pipeline = redis.multi();
-  for (const { id: key } of result as any) {
+  for (const [,text_score,,key,,hybrid_score] of results) {
+    console.log(key, text_score, hybrid_score);
     pipeline.json.get(key, { path: ["$.lemma", "$.pos", "$.lang"] });
   }
 
-  const results = await pipeline.exec() as unknown as Record<string, string[]>[];
-  const parsed = results.map(r => ({
-    lemma: r["$.lemma"][0] as string,
-    pos: r["$.pos"][0] as WordnetPOS,
-    lang: r["$.lang"][0] as Language,
+  const data = await pipeline.exec() as unknown as Record<string, string[]>[];
+  const parsed = data.map(d => ({
+    lemma: d["$.lemma"][0] as string,
+    pos: d["$.pos"][0] as WordnetPOS,
+    lang: d["$.lang"][0] as Language,
   }));
 
   return parsed;

@@ -9,8 +9,9 @@ const search: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
     Querystring: { q?: string; pos?: string; k?: string };
   }>("/search", async (request, reply) => {
     const { q, pos, k } = request.query;
+    const input = q?.trim();
 
-    if (!q?.trim()) {
+    if (!input) {
       return reply.code(400).send({ error: "Query parameter 'q' is required" });
     }
     if (pos && !Object.values(WordnetPOS).includes(pos as WordnetPOS)) {
@@ -20,8 +21,8 @@ const search: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
     const limit = k ? Math.min(Math.max(1, Number.parseInt(k, 10)), 100) : RESULTS_LENGTH;
 
     try {
-      const filters = { pos: { text: pos as WordnetPOS } };
-      const results = await wordSearch(q.trim(), filters, limit);
+      const filters = { lemma: { text: input } };
+      const results = await wordSearch(input, filters, limit);
       return results;
     }
     catch (err) {

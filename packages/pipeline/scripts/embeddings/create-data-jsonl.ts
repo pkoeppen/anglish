@@ -59,8 +59,7 @@ async function createLemmaDataJSONL() {
       synset.id AS synset_id,
       lemma.lemma,
       lemma.pos,
-      lemma.lang,
-      synset.gloss
+      lemma.lang
     FROM lemma
     JOIN sense ON sense.lemma_id = lemma.id
     JOIN synset ON sense.synset_id = synset.id
@@ -88,7 +87,6 @@ async function createLemmaDataJSONL() {
           lemma: r.lemma,
           pos: r.pos,
           lang: r.lang,
-          gloss: r.gloss,
         };
         dataStream.write(`${JSON.stringify(data)}\n`);
         embeddingStream.write(buffer);

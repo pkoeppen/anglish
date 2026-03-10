@@ -16,6 +16,5 @@ export interface RedisLemmaData {
   lemma: string;
   pos: WordnetPOS;
   lang: Language;
-  gloss: string;
   embedding: Float32Array;
 }

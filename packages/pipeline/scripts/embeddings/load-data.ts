@@ -5,7 +5,7 @@ import { readSync } from "node:fs";
 import { open } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { redis, REDIS_LEMMA_DATA_PREFIX, REDIS_SYNSET_DATA_PREFIX } from "@anglish/db";
+import { db, redis, REDIS_LEMMA_DATA_PREFIX, REDIS_SYNSET_DATA_PREFIX } from "@anglish/db";
 import { dataRoot } from "../../src/constants";
 
 const EMBEDDING_DIM = 3072;
@@ -94,10 +94,14 @@ async function loadLemmaData() {
   process.stdout.write("\n");
 }
 
-function readEmbedding(fd: number, offset: number): Float32Array {
+// The embedding must be of type number[] and not Float32Array
+// before being passed to the node-redis client. Otherwise, it will
+// serialize it as an object, like { "0": 0.123, "1": -0.987, ... }
+function readEmbedding(fd: number, offset: number): number[] {
   const buf = Buffer.allocUnsafe(EMBEDDING_BYTES);
   readSync(fd, buf, 0, buf.length, offset);
-  return new Float32Array(buf.buffer, buf.byteOffset, EMBEDDING_DIM);
+  const f32 = new Float32Array(buf.buffer, buf.byteOffset, EMBEDDING_DIM);
+  return Array.from(f32);
 }
 
 async function main() {
