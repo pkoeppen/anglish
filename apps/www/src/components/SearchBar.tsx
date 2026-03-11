@@ -35,7 +35,7 @@ export default function SearchBar() {
         params.set("lang", "an");
       }
       const res = await fetch(
-        `http://localhost:3000/search?${params.toString()}`,
+        `http://localhost:3002/search?${params.toString()}`,
       );
       const data = await res.json();
       if (query().trim() === q) {

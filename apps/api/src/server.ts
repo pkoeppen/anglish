@@ -2,7 +2,7 @@ import process from "node:process";
 import Fastify from "fastify";
 import app from "./app";
 
-const PORT = 3000;
+const PORT = 3002;
 
 const fastify = Fastify({
   logger: {

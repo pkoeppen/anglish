@@ -1,15 +1,21 @@
 {
   "name": "@anglish/editor",
+  "type": "module",
   "version": "0.0.0",
   "description": "",
-  "type": "module",
+  "license": "MIT",
   "scripts": {
     "start": "vite",
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview"
   },
-  "license": "MIT",
+  "dependencies": {
+    "@anglish/api": "workspace:*",
+    "@solidjs/router": "^0.15.1",
+    "lucide-solid": "^0.577.0",
+    "solid-js": "^1.9.11"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",
     "eslint-plugin-solid": "^0.14.5",
@@ -18,11 +24,5 @@
     "tailwindcss": "^4.1.13",
     "vite": "^7.1.4",
     "vite-plugin-solid": "^2.11.8"
-  },
-  "dependencies": {
-    "@anglish/api": "workspace:*",
-    "@solidjs/router": "^0.15.1",
-    "lucide-solid": "^0.577.0",
-    "solid-js": "^1.9.11"
   }
 }

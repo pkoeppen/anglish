@@ -50,7 +50,6 @@ export function TranslationProvider(props: {
     if (!input())
       return;
     try {
-      console.log("handleTranslate");
       setIsTranslating(true);
       // const result = await translate({ input: input(), excludePOS: [...excludePOS()] });
       // if (result.success && result.data) {
@@ -59,7 +58,7 @@ export function TranslationProvider(props: {
       //   setTerms([]);
       // }
       const res = await fetch(
-        `http://localhost:3000/translate?q=${encodeURIComponent(input())}&exclude=${encodeURIComponent(excludePOS().join(","))}`,
+        `http://localhost:3002/translate?q=${encodeURIComponent(input())}&exclude=${encodeURIComponent(excludePOS().join(","))}`,
       );
       const data = await res.json();
       if (data) {
