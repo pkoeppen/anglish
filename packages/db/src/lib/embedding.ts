@@ -14,3 +14,14 @@ export async function createEmbedding(text: string) {
 
   return Float32Array.from(response.data[0].embedding);
 }
+
+export function combineEmbeddings(items: { embedding: Float32Array; weight: number }[]) {
+  const length = items[0].embedding.length;
+  const out = new Float32Array(length);
+  for (const { embedding, weight } of items) {
+    for (let i = 0; i < length; i++) {
+      out[i] += embedding[i] * weight;
+    }
+  }
+  return out;
+}

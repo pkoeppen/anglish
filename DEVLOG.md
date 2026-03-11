@@ -18,6 +18,7 @@ There are a few basics approaches.
 
 1) A `synset:*` data key that stores synset data with a "members" prop. Since there are only ~107,000 synsets with unique definition embeddings, this is half the size of the second approach. However, matching on or filtering out specific words is more difficult, and unless a redundant array of member data is stored, a second fetch for each member is required for enrichment.
   - Update: In response to the below update, I could add TEXT/TAG indexes on $.members[*]. I think that would work.
+  - Update: This cut the total memory size in Redis in half, as expected.
 
 2) A `lemma:*` data key that stores lemma/sense/synset combo data. This is much larger in memory, with ~210,000 unique entries and synset definition embedding duplication. However, this is more straightforward for direct word matching/filtering via TAG and TEXT attributes.
   - Update: Shit, I didn't realize that this will return multiple same lemmas (with different senses) per word search. So searching "book" returns like 20 "book" results, which is not what we want - we need it to return distinct lemmas, which I don't think is possible using only Redis.

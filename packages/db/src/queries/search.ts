@@ -1,163 +1,173 @@
 import type { Language, WordnetPOS } from "@anglish/core";
 import { Buffer } from "node:buffer";
 import { logger } from "@anglish/core/server";
-import { REDIS_LEMMA_VSS_INDEX } from "../constants";
-import { createEmbedding } from "../lib";
+import { REDIS_SYNSET_VSS_INDEX_HNSW } from "../constants";
+import { combineEmbeddings, createEmbedding } from "../lib";
 import { redis } from "../redis";
 
+const MIN_HYBRID_SCORE = 0.1;
+
 /* eslint-disable antfu/consistent-list-newline */
-type RedisHybridSearchResult = [
+type RedisHybridResponse = [
   "total_results", number,
-  "results", [
-    "text_score", string,
-    "__key", string,
-    "vector_score", string,
-    "hybrid_score", string,
-  ][],
+  "results", string[][],
   "warnings", string[],
   "execution_time", string,
 ];
 /* eslint-enable */
 
-interface Filter<T> {
-  text: T;
-  exclude?: boolean;
-}
-
-export async function wordSearch(
-  text: string,
-  filters?: {
-    lemma?: Filter<string>;
-    pos?: Filter<WordnetPOS>;
-    lang?: Filter<Language>;
-  },
-  k = 20,
-) {
-  const embedding = await createEmbedding(text);
+export async function wordSearch(input: string, lang?: Language, limit = 20) {
+  const embedding = await createEmbedding(input);
   const bytes = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
-
-  const filterArr: string[] = [];
-  const optionalArr: string[] = [];
-
-  if (filters) {
-    const { lemma, pos, lang } = filters;
-    if (pos?.text) {
-      filterArr.push(`${pos.exclude ? "-" : ""}@pos:{${escapeTag(pos.text)}}`);
-    }
-    if (lang?.text) {
-      filterArr.push(`${lang.exclude ? "-" : ""}@lang:{${escapeTag(lang.text)}}`);
-    }
-    if (lemma?.text) {
-      const exactTag = `(@lemma_tag:{${escapeTag(lemma.text)}}) => { $weight: 20.0; }`;
-      const exactText = `(@lemma_text:"${escapeText(lemma.text)}") => { $weight: 8.0; }`;
-      optionalArr.push(`~${exactTag}`);
-      optionalArr.push(`~${exactText}`);
-      if (lemma.text.length >= 2) {
-        const prefixText = `(@lemma_text:${escapeText(lemma.text)}*) => { $weight: 3.0; }`;
-        optionalArr.push(`~${prefixText}`);
-      }
-    }
+  const queryParts = [
+    `~(@lemma_tag:{${input}}) => { $weight: 20.0; }`,
+    `~(@lemma_text:"${input}") => { $weight: 8.0; }`,
+    `~(@lemma_text:${input}*) => { $weight: 3.0; }`,
+  ];
+  if (lang) {
+    queryParts.push(`@lemma_lang:{${lang}}`);
   }
-
-  const queryParts: string[] = [];
-
-  if (filterArr.length) {
-    queryParts.push(`(${filterArr.join(" ")})`);
-  }
-
-  if (optionalArr.length) {
-    queryParts.push(optionalArr.join(" "));
-  }
+  const query = queryParts.join(" ");
 
   /* eslint-disable antfu/consistent-list-newline */
-  const query = queryParts.length ? queryParts.join(" ") : "*";
   const command = [
-    "FT.HYBRID", REDIS_LEMMA_VSS_INDEX,
+    "FT.HYBRID", REDIS_SYNSET_VSS_INDEX_HNSW,
     "SEARCH", query,
     "YIELD_SCORE_AS", "text_score",
     "VSIM", "@embedding", "$vec",
-    "KNN", "4", "K", String(k), "EF_RUNTIME", "100",
+    "KNN", "4", "K", "20", "EF_RUNTIME", "100",
     "YIELD_SCORE_AS", "vector_score",
     "COMBINE", "LINEAR", "6", "ALPHA", "0.85", "BETA", "0.15", "YIELD_SCORE_AS", "hybrid_score",
     "SORTBY", "2", "@hybrid_score", "DESC",
+    "LIMIT", "0", "50",
     "PARAMS", "2", "vec", bytes,
   ];
   /* eslint-enable */
 
-  const result = await redis.sendCommand(command) as RedisHybridSearchResult;
-  const [,total_results,,results,,_warnings,,execution_time] = result;
+  const res = await redis.sendCommand(command) as RedisHybridResponse;
+  const [,total_results,,results,,,,execution_time] = res;
 
-  logger.debug(`Found ${total_results} results for "${text}" (${execution_time} ms)`);
+  logger.debug(`Found ${total_results} synsets for "${input}" (${execution_time} ms)`);
 
   const pipeline = redis.multi();
-  for (const [,text_score,,key,,hybrid_score] of results) {
-    console.log(key, text_score, hybrid_score);
-    pipeline.json.get(key, { path: ["$.lemma", "$.pos", "$.lang"] });
+  for (const result of results) {
+    const obj: Record<string, string> = {};
+    for (let i = 0; i < result.length; i += 2) {
+      const key = result[i];
+      const val = result[i + 1];
+      obj[key] = val;
+    }
+    if (Number.parseFloat(obj.hybrid_score) < MIN_HYBRID_SCORE) {
+      break;
+    }
+    pipeline.json.get(obj.__key, { path: ["$.members"] });
   }
 
-  const data = await pipeline.exec() as unknown as Record<string, string[]>[];
-  const parsed = data.map(d => ({
-    lemma: d["$.lemma"][0] as string,
-    pos: d["$.pos"][0] as WordnetPOS,
-    lang: d["$.lang"][0] as Language,
-  }));
+  const data = await pipeline.exec() as unknown as ([[ { lemma: string; lang: Language }]] | null)[];
+  const lemmas = new Set<string>();
+  const langByLemma: Record<string, Language> = {};
 
-  return parsed;
+  main: for (let i = 0; i < data.length; i++) {
+    const items = data[i]?.[0];
+    if (items) {
+      for (const item of items) {
+        if (lang && lang !== item.lang) {
+          continue;
+        }
+        lemmas.add(item.lemma);
+        langByLemma[item.lemma] = item.lang;
+        if (lemmas.size >= limit) {
+          break main;
+        }
+      }
+    }
+  }
+
+  const sorted = Array.from(lemmas).sort((a, b) => {
+    // Prefer exact matches.
+    if (a === input) {
+      return -1;
+    }
+    if (b === input) {
+      return 1;
+    }
+    // Then partial matches.
+    if (a.startsWith(input)) {
+      return -1;
+    }
+    if (b.startsWith(input)) {
+      return 1;
+    }
+    return 0;
+  });
+
+  const withLang = sorted.map(lemma => ({ lemma, lang: langByLemma[lemma] }));
+
+  return withLang;
 }
 
 export async function translationSearch(
-  embedding: Float32Array,
-  filters?: {
-    lemma?: Filter<string>;
-    pos?: Filter<WordnetPOS>;
-    lang?: Filter<Language>;
+  lemma: string,
+  context: string,
+  filter: {
+    pos: WordnetPOS;
+    lang: Language;
   },
-  k = 20,
+  limit = 10,
 ) {
+  const [lemmaEmbedding, contextEmbedding] = await Promise.all([
+    createEmbedding(lemma),
+    createEmbedding(context),
+  ]);
+  const embedding = combineEmbeddings([
+    { embedding: lemmaEmbedding, weight: 0.85 },
+    { embedding: contextEmbedding, weight: 0.15 },
+  ]);
   const bytes = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
 
-  const filterArr = [];
-  if (filters) {
-    const { lemma, pos, lang } = filters;
-    if (lemma?.text) {
-      filterArr.push(`${lemma.exclude ? "-" : ""}@lemma:{${lemma.text}} `);
-    }
-    if (pos?.text) {
-      filterArr.push(`${pos.exclude ? "-" : ""}@pos:{${pos.text}} `);
-    }
-    if (lang?.text) {
-      filterArr.push(`${lang.exclude ? "-" : ""}@lang:{${lang.text}}`);
-    }
-  }
-  const filterStr = filterArr.length ? `(${filterArr.join(",")})` : "*";
-  const query = `${filterStr}=>[KNN ${k} @embedding $query_vector AS score]`;
+  const filterStr = [
+    `@lemma_lang:{${filter.lang}}`,
+    `@pos:{${filter.pos}}`,
+  ].join(" ");
+  const query = `(${filterStr}) => [KNN ${limit} @embedding $vec AS score]`;
 
-  const vssResult = await redis.ft.search(REDIS_LEMMA_VSS_INDEX, query, {
+  const vssResult = await redis.ft.search(REDIS_SYNSET_VSS_INDEX_HNSW, query, {
     SORTBY: "score",
     RETURN: ["score", "pos"],
     DIALECT: 2,
     PARAMS: {
-      query_vector: bytes,
+      vec: bytes,
     },
     LIMIT: {
       from: 0,
-      size: k,
+      size: 50,
     },
   });
 
   const pipeline = redis.multi();
   for (const { id: key } of vssResult.documents) {
-    pipeline.json.get(key, { path: ["$.lemma", "$.pos", "$.lang"] });
+    pipeline.json.get(key, { path: ["$.members"] });
   }
 
-  const results = await pipeline.exec() as unknown as Record<string, string[]>[];
-  const parsed = results.map(r => ({
-    lemma: r["$.lemma"][0] as string,
-    pos: r["$.pos"][0] as WordnetPOS,
-    lang: r["$.lang"][0] as Language,
-  }));
+  const data = await pipeline.exec() as unknown as ([[ { lemma: string; lang: Language }]] | null)[];
+  const lemmas = new Set<string>();
 
-  return parsed;
+  main: for (let i = 0; i < data.length; i++) {
+    const items = data[i]?.[0];
+    if (items) {
+      for (const item of items) {
+        if (filter.lang !== item.lang) {
+          continue;
+        }
+        lemmas.add(item.lemma);
+        if (lemmas.size >= limit) {
+          break main;
+        }
+      }
+    }
+  }
+
+  return Array.from(lemmas);
 }
 
 export function escapeTag(value: string): string {

@@ -1,7 +1,7 @@
 import type { Term } from "compromise/misc";
-import { combineEmbeddings, Language, makeLimiter, WordnetPOS } from "@anglish/core";
+import { Language, makeLimiter, WordnetPOS } from "@anglish/core";
 import { logger } from "@anglish/core/server";
-import { createEmbedding, redis, REDIS_LEMMA_DATA_PREFIX, translationSearch } from "@anglish/db";
+import { db, translationSearch } from "@anglish/db";
 import compromise from "compromise";
 import { SKIP_WORDS } from "./constants";
 
@@ -19,7 +19,6 @@ interface OutputTerm {
 export async function translateText(input: string, excludePOS: Set<WordnetPOS>) {
   const terms = compromise(input).terms().termList();
   const output: OutputTerm[] = [];
-  const pipeline = redis.multi();
   const run = makeLimiter(30, 4500);
   const promises = [];
 
@@ -28,54 +27,46 @@ export async function translateText(input: string, excludePOS: Set<WordnetPOS>) 
     const { lemma, restoreFn } = getLemma(term);
     const pos = tagsToPOS(term.tags);
     const willTranslate = !!lemma && !!pos && !excludePOS?.has(pos) && !SKIP_WORDS.has(lemma);
+
+    // TODO: batch this into one query
+    const record = await db.kysely
+      .selectFrom("lemma")
+      .select("lang")
+      .where("lemma", "=", lemma)
+      .where("pos", "=", pos)
+      .executeTakeFirst();
+
     const outputTerm: OutputTerm = {
       normal: term.normal,
       text: term.text,
       pre: term.pre,
       post: term.post,
       pos,
-      isAnglish: false,
+      isAnglish: record?.lang === Language.Anglish,
       synonyms: [],
       didTranslate: willTranslate,
     };
-    output.push(outputTerm);
 
-    const key = `${REDIS_LEMMA_DATA_PREFIX}${lemma}:${pos}`;
-    pipeline.json.get(key, { path: ["$.lang"] });
+    output.push(outputTerm);
 
     if (willTranslate) {
       promises.push(
         run(async () => {
           // Fetch Anglish synonyms with Redis VSS.
           const context = getContextWindow(terms, i);
-          const [wordEmbedding, contextEmbedding] = await Promise.all([
-            createEmbedding(lemma),
-            createEmbedding(context),
-          ]);
-          const queryEmbedding = combineEmbeddings([
-            { embedding: wordEmbedding, weight: 0.85 },
-            { embedding: contextEmbedding, weight: 0.15 },
-          ]);
-          const filters = {
-            lemma: { text: lemma, exclude: true },
-            pos: { text: pos },
-            lang: { text: Language.Anglish },
+          const filter = {
+            pos,
+            lang: Language.Anglish,
           };
-          const results = await translationSearch(queryEmbedding, filters);
-          const synonyms = results.map(r => restoreFn?.(r.lemma) ?? r.lemma);
-          outputTerm.synonyms = synonyms;
+          const synonyms = await translationSearch(lemma, context, filter);
+          const restored = synonyms.map(l => restoreFn?.(l) ?? l);
+          outputTerm.synonyms = restored;
         }),
       );
     }
   }
 
-  promises.unshift(pipeline.exec());
-  const resolved = await Promise.all(promises);
-  const pipelineResults = resolved[0] as unknown as (string[] | null)[];
-  for (let i = 0; i < pipelineResults.length; i++) {
-    const lang = pipelineResults[i]?.[0];
-    output[i].isAnglish = lang === Language.Anglish;
-  }
+  await Promise.all(promises);
 
   return output;
 }
@@ -118,7 +109,7 @@ function getLemmaFromPlural(term: Term) {
   const doc = compromise(term.normal).nouns().toSingular();
   const lemma = doc.out();
 
-  logger.debug(`Converting "${term}" to "${lemma}"`);
+  logger.debug(`Converting "${term.normal}" to "${lemma}"`);
 
   return {
     lemma,

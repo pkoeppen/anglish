@@ -99,24 +99,11 @@ export async function retry<T>(fn: () => Promise<T>, retries = 3, delay = 1000):
     return await fn();
   }
   catch (error) {
-    console.error(`Retry: ${error}`.red);
+    console.error(`Retry: ${error}`);
     if (retries > 0) {
       sleep(delay);
       return await retry(fn, retries - 1);
     }
     throw error;
   }
-}
-
-export function combineEmbeddings(
-  items: { embedding: Float32Array; weight: number }[],
-): Float32Array {
-  const length = items[0].embedding.length;
-  const out = new Float32Array(length);
-  for (const { embedding, weight } of items) {
-    for (let i = 0; i < length; i++) {
-      out[i] += embedding[i] * weight;
-    }
-  }
-  return out;
 }
