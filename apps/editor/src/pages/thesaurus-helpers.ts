@@ -1,11 +1,9 @@
 import type { Lemma, Sense, SenseRelation, Synset } from "./thesaurus-mock-data";
 import {
-
   MOCK_LEMMAS,
   MOCK_SENSE_RELATIONS,
   MOCK_SENSES,
   MOCK_SYNSETS,
-
 } from "./thesaurus-mock-data";
 
 export function getSensesForLemma(lemmaId: Lemma["id"]): Sense[] {

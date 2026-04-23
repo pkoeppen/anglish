@@ -152,13 +152,13 @@ export enum OriginKind {
   Borrowed = "borrowed",
   Cognate = "cognate",
   Compound = "compound",
-  Calque = "calque"
+  Calque = "calque",
 }
 
 export interface WordOrigin {
-  lang: OriginLanguage,
-  kind: OriginKind,
-  form: string // The source word form. Ex: "bōtuz"
+  lang: OriginLanguage;
+  kind: OriginKind;
+  form: string; // The source word form. Ex: "bōtuz"
 }
 
 export enum SenseRelation {

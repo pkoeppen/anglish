@@ -16,15 +16,12 @@ export default function ThesaurusNav() {
   const isSynsets = () => location.pathname.startsWith("/synsets");
 
   return (
-    <nav class="flex items-center justify-between border-b border-slate-200 bg-white px-6 pt-4">
-      <div class="flex items-baseline gap-6">
+    <nav class="flex items-center justify-between border-b border-slate-200 bg-white px-6 h-12">
+      <div class="flex items-center gap-6">
         <div>
           <h1 class="text-lg font-semibold text-slate-900">
-            Anglish Thesaurus Editor
+            Anglish Wiki - Editor
           </h1>
-          <p class="mt-0.5 text-xs text-slate-500">
-            Browse lemmas, synsets, and the senses that connect them.
-          </p>
         </div>
 
         <div class="ml-6 flex gap-1">
@@ -37,10 +34,10 @@ export default function ThesaurusNav() {
         </div>
       </div>
 
-      <div class="flex items-center gap-2 text-xs text-slate-400">
-        <span class="rounded-full border border-dashed border-slate-300 px-2 py-0.5">
-          Mock data only
-        </span>
+      <div class="flex items-center gap-2 text-sm text-slate-600">
+        <button class="px-3 py-1.5 hover:bg-slate-100 cursor-pointer rounded-md">
+          Login
+        </button>
       </div>
     </nav>
   );

@@ -1,3 +1,6 @@
+/*
+ * ENUMS
+ */
 CREATE TYPE language_enum AS ENUM ('en', 'an');
 CREATE TYPE pos_enum AS ENUM ('n', 'v', 'a', 's', 'r');
 CREATE TYPE source_enum AS ENUM ('wordnet', 'user');
@@ -46,7 +49,17 @@ CREATE TYPE origin_kind_enum AS ENUM (
   'compound',
   'calque'
 );
-/* Synset */
+CREATE TYPE lemma_status_enum AS ENUM ('draft', 'published')
+/*
+ * TRIGGERS
+ */
+CREATE OR REPLACE FUNCTION set_updated_at() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW();
+RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+/*
+ * Synsets
+ */
 CREATE TABLE synset (
   id VARCHAR(14) PRIMARY KEY,
   pos pos_enum NOT NULL,
@@ -58,14 +71,24 @@ CREATE TABLE synset (
 CREATE INDEX index__synset__pos ON synset(pos);
 CREATE INDEX index__synset__ili ON synset(ili);
 CREATE INDEX index__synset__source ON synset(source);
-/* Lemma */
+/*
+ * Lemmas
+ */
 CREATE TABLE lemma (
   id SERIAL PRIMARY KEY,
   lemma TEXT NOT NULL,
   pos pos_enum NOT NULL,
-  lang language_enum NOT NULL DEFAULT 'en'
+  lang language_enum NOT NULL DEFAULT 'en',
+  status lemma_status_enum NOT NULL DEFAULT 'draft',
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX index__lemma__lemma_pos_lang ON lemma(lemma, pos, lang);
+CREATE TRIGGER trigger_lemma_set_updated_at
+BEFORE UPDATE ON lemma
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
 /* Sense */
 CREATE TABLE sense (
   id SERIAL PRIMARY KEY,

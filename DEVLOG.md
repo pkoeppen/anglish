@@ -41,6 +41,16 @@ The main issue here is trying to cram two functionalities into one index while k
   - _change 1_
   - _change 2_
 - **Notes / Decisions**:
+  - I knew Varun was an idiot the moment I peered into his code. Vibe-coded in its entirety, the project bore no trace of his having personally understood any of it. I can see how that monstrosity developed, though; using AI now to sprint the final leg of Anglish, it is easy to perceive how one would have no clue what the agent is implementing or how it works. I feel that it will important to shield oneself against this mental atrophy in order to stay employed. Most engineers will likely succumb to laziness and simply let the machines do their work for them.
+- **Next up**:
+  - _what I plan to do next time_
+
+### 2026-04-23
+- **Focus**: Complete the lemma/synset editor
+- **Changes**:
+  - _change 1_
+  - _change 2_
+- **Notes / Decisions**:
   - _architectural or product decisions_
 - **Next up**:
   - _what I plan to do next time_

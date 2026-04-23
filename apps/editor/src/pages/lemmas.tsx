@@ -1,19 +1,35 @@
 import type { Lemma, Sense, Synset } from "./thesaurus-mock-data";
-import { createMemo, createSignal, For, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import ThesaurusNav from "../components/ThesaurusNav";
 import {
   getLemmaForSense,
   getRelationsForSense,
-  getSenseById,
   getSynsetForSense,
 } from "./thesaurus-helpers";
-import { MOCK_LEMMAS, MOCK_SENSES, MOCK_SYNSETS } from "./thesaurus-mock-data";
 
 interface ApiLemma {
   id: number;
   lemma: string;
   pos: string;
   lang: string;
+  status: Lemma["status"];
+  notes: string | null;
+  senses: ApiSense[];
+}
+
+interface ApiSense {
+  id: number;
+  lemmaId: number;
+  synsetId: string;
+  gloss: string;
+}
+
+interface ApiLemmaResponse {
+  data: ApiLemma[];
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
 }
 
 function posShort(pos: Lemma["pos"]) {
@@ -54,55 +70,131 @@ function mapApiLemmaToLemma(row: ApiLemma): Lemma {
     id: String(row.id),
     text: row.lemma,
     pos: wordnetPosToLemmaPos(row.pos),
-    status: "draft",
-    notes: undefined,
+    status: row.status,
+    notes: row.notes ?? undefined,
   };
 }
 
-export default function LemmaBrowser() {
-  const [lemmas, setLemmas] = createSignal<Lemma[]>(MOCK_LEMMAS);
-  const [searchQuery, setSearchQuery] = createSignal("");
-  const [selectedId, setSelectedId] = createSignal<string | null>(
-    MOCK_LEMMAS[0]?.id ?? null,
+function mapApiSenseToSense(row: ApiSense): Sense {
+  return {
+    id: String(row.id),
+    lemmaId: String(row.lemmaId),
+    synsetId: row.synsetId,
+    gloss: row.gloss,
+  };
+}
+
+const SEARCH_DEBOUNCE_MS = 250;
+const DEFAULT_PAGE_SIZE = 50;
+
+function LemmaStatusLabel(props: { status: Lemma["status"] }) {
+  return (
+    <span
+      class={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${
+        props.status === "published"
+          ? "bg-emerald-50 text-emerald-700"
+          : "bg-amber-50 text-amber-700"
+      }`}
+    >
+      {statusLabel(props.status)}
+    </span>
   );
+}
+
+export default function LemmaBrowser() {
+  const [lemmas, setLemmas] = createSignal<Lemma[]>([]);
+  const [sensesByLemmaId, setSensesByLemmaId] = createSignal<Record<string, Sense[]>>({});
+  const [searchQuery, setSearchQuery] = createSignal("");
+  const [selectedId, setSelectedId] = createSignal<string | null>(null);
   const [selectedSenseId, setSelectedSenseId] = createSignal<string | null>(
     null,
   );
+  const [isLoading, setIsLoading] = createSignal(false);
+  const [loadError, setLoadError] = createSignal<string | null>(null);
+  const [page, setPage] = createSignal(1);
+  const [size] = createSignal(DEFAULT_PAGE_SIZE);
+  const [total, setTotal] = createSignal(0);
+  const [totalPages, setTotalPages] = createSignal(0);
+  let latestRequestId = 0;
 
-  const filteredLemmas = createMemo(() => {
-    const all = lemmas();
-    const q = searchQuery().toLowerCase().trim();
-    if (!q)
-      return all;
-    return all.filter(
-      lemma =>
-        lemma.text.toLowerCase().includes(q)
-        || lemma.notes?.toLowerCase().includes(q),
-    );
-  });
+  const fetchLemmas = async (query: string, nextPage: number) => {
+    const requestId = ++latestRequestId;
+    const trimmed = query.trim();
+    const params = new URLSearchParams();
+    if (trimmed)
+      params.set("q", trimmed);
+    params.set("page", String(nextPage));
+    params.set("size", String(size()));
+    const url = params.size > 0 ? `/api/lemmas?${params.toString()}` : "/api/lemmas";
+
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch(url);
+      if (!res.ok)
+        throw new Error(`Failed to load lemmas (${res.status})`);
+
+      const payload = (await res.json()) as ApiLemmaResponse;
+      const mapped = payload.data.map(mapApiLemmaToLemma);
+      const nextSensesByLemmaId = Object.fromEntries(
+        payload.data.map(row => [
+          String(row.id),
+          (row.senses ?? []).map(mapApiSenseToSense),
+        ]),
+      );
+      if (requestId !== latestRequestId)
+        return;
+
+      setLemmas(mapped);
+      setSensesByLemmaId(nextSensesByLemmaId);
+      setPage(payload.page);
+      setTotal(payload.total);
+      setTotalPages(payload.totalPages);
+      const currentSelectedId = selectedId();
+      const nextSelectedId = mapped.some(l => l.id === currentSelectedId)
+        ? currentSelectedId
+        : (mapped[0]?.id ?? null);
+      setSelectedId(nextSelectedId);
+      if (!nextSelectedId)
+        setSelectedSenseId(null);
+    }
+    catch (err) {
+      if (requestId !== latestRequestId)
+        return;
+      console.error("Error fetching lemmas", err);
+      setLemmas([]);
+      setSensesByLemmaId({});
+      setTotal(0);
+      setTotalPages(0);
+      setSelectedId(null);
+      setSelectedSenseId(null);
+      setLoadError("Could not load lemmas. Please try again.");
+    }
+    finally {
+      if (requestId === latestRequestId)
+        setIsLoading(false);
+    }
+  };
 
   const selectedLemma = createMemo<Lemma | undefined>(() => {
     const currentId = selectedId();
     if (!currentId)
       return undefined;
-    return (
-      filteredLemmas().find(l => l.id === currentId)
-      ?? lemmas().find(l => l.id === currentId)
-    );
+    return lemmas().find(l => l.id === currentId);
   });
 
   const sensesForSelected = createMemo<Sense[]>(() => {
     const id = selectedLemma()?.id;
     if (!id)
       return [];
-    return MOCK_SENSES.filter(s => s.lemmaId === id);
+    return sensesByLemmaId()[id] ?? [];
   });
 
   const selectedSense = createMemo<Sense | undefined>(() => {
     const id = selectedSenseId();
     if (!id)
       return undefined;
-    return getSenseById(id);
+    return sensesForSelected().find(sense => sense.id === id);
   });
 
   const relationsForSelectedSense = createMemo(() => {
@@ -112,26 +204,31 @@ export default function LemmaBrowser() {
     return getRelationsForSense(id);
   });
 
-  const synsetById = (id: Synset["id"]) =>
-    MOCK_SYNSETS.find(s => s.id === id);
+  createEffect(() => {
+    searchQuery();
+    setPage(1);
+  });
 
-  onMount(async () => {
-    try {
-      const res = await fetch("/api/lemmas");
-      if (!res.ok) {
-        console.error("Failed to load lemmas", res.status);
-        return;
-      }
-      const data = (await res.json()) as ApiLemma[];
-      const mapped = data.map(mapApiLemmaToLemma);
-      if (mapped.length > 0) {
-        setLemmas(mapped);
-        setSelectedId(mapped[0].id);
-      }
-    }
-    catch (err) {
-      console.error("Error fetching lemmas", err);
-    }
+  createEffect(() => {
+    const query = searchQuery();
+    const currentPage = page();
+    const timer = setTimeout(() => {
+      void fetchLemmas(query, currentPage);
+    }, SEARCH_DEBOUNCE_MS);
+    onCleanup(() => clearTimeout(timer));
+  });
+
+  createEffect(() => {
+    const currentSenseId = selectedSenseId();
+    const currentLemmaId = selectedLemma()?.id;
+    if (!currentSenseId || !currentLemmaId)
+      return;
+
+    const stillBelongsToSelectedLemma = (sensesByLemmaId()[currentLemmaId] ?? []).some(
+      sense => sense.id === currentSenseId,
+    );
+    if (!stillBelongsToSelectedLemma)
+      setSelectedSenseId(null);
   });
 
   return (
@@ -190,49 +287,110 @@ export default function LemmaBrowser() {
                     DB
                   </span>
                 </div>
+                <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>
+                    {total().toLocaleString()}
+                    {" "}
+                    result
+                    {total() === 1 ? "" : "s"}
+                  </span>
+                  <div class="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      class="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={isLoading() || page() <= 1}
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                    >
+                      Prev
+                    </button>
+                    <span class="text-[10px] uppercase tracking-wide text-slate-500">
+                      Page
+                      {" "}
+                      {totalPages() === 0 ? 0 : page()}
+                      {" / "}
+                      {totalPages()}
+                    </span>
+                    <button
+                      type="button"
+                      class="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={isLoading() || totalPages() === 0 || page() >= totalPages()}
+                      onClick={() => setPage(p => Math.min(totalPages(), p + 1))}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div class="flex-1 overflow-auto px-1 py-2">
-                <div class="flex flex-col gap-1 text-xs">
-                  <For each={filteredLemmas()}>
-                    {(lemma) => {
-                      const senseCount = MOCK_SENSES.filter(
-                        s => s.lemmaId === lemma.id,
-                      ).length;
-                      const isSelected = () => selectedId() === lemma.id;
-                      return (
-                        <button
-                          type="button"
-                          class={`rounded-md border px-3 py-2 text-left ${
-                            isSelected()
-                              ? "border-sky-200 bg-sky-50 text-slate-900"
-                              : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50"
-                          }`}
-                          onClick={() => setSelectedId(lemma.id)}
-                        >
-                          <div class="flex items-center justify-between gap-2">
-                            <div class="font-medium">{lemma.text}</div>
-                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">
-                              {posShort(lemma.pos)}
-                            </span>
+                <Show
+                  when={loadError()}
+                  fallback={(
+                    <Show
+                      when={!isLoading()}
+                      fallback={(
+                        <div class="px-3 py-2 text-xs text-slate-500">
+                          Loading lemmas...
+                        </div>
+                      )}
+                    >
+                      <Show
+                        when={lemmas().length > 0}
+                        fallback={(
+                          <div class="px-3 py-2 text-xs text-slate-500">
+                            No lemmas found.
                           </div>
-                          <div class="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                            <span>
-                              status:
-                              {lemma.status}
-                            </span>
-                            <span>
-                              {senseCount}
-                              {" "}
-                              sense
-                              {senseCount === 1 ? "" : "s"}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    }}
-                  </For>
-                </div>
+                        )}
+                      >
+                        <div class="flex flex-col gap-1 text-xs">
+                          <For each={lemmas()}>
+                            {(lemma) => {
+                              const realSenseCount = (sensesByLemmaId()[lemma.id] ?? []).length;
+                              const isSelected = () => selectedId() === lemma.id;
+                              return (
+                                <button
+                                  type="button"
+                                  class={`rounded-md border px-3 py-2 text-left cursor-pointer ${
+                                    isSelected()
+                                      ? "border-sky-200 bg-sky-50 text-slate-900"
+                                      : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50"
+                                  }`}
+                                  onClick={() => setSelectedId(lemma.id)}
+                                >
+                                  <div class="flex items-center justify-between gap-2">
+                                    <div class="font-medium">{lemma.text}</div>
+                                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">
+                                      {posShort(lemma.pos)}
+                                    </span>
+                                  </div>
+                                  <div class="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                                    <span
+                                      class={`text-[10px] uppercase tracking-wide ${
+                                        lemma.status === "published"
+                                          ? "text-emerald-500"
+                                          : "text-amber-700"
+                                      }`}
+                                    >
+                                      {statusLabel(lemma.status)}
+                                    </span>
+                                    <span>
+                                      {realSenseCount}
+                                      {" "}
+                                      sense
+                                      {realSenseCount === 1 ? "" : "s"}
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            }}
+                          </For>
+                        </div>
+                      </Show>
+                    </Show>
+                  )}
+                >
+                  <div class="px-3 py-2 text-xs text-red-600">{loadError()}</div>
+                </Show>
               </div>
             </div>
           </div>
@@ -259,15 +417,7 @@ export default function LemmaBrowser() {
                             <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-600">
                               {posShort(lemma().pos)}
                             </span>
-                            <span
-                              class={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${
-                                lemma().status === "published"
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-amber-50 text-amber-700"
-                              }`}
-                            >
-                              {statusLabel(lemma().status)}
-                            </span>
+                            <LemmaStatusLabel status={lemma().status} />
                           </div>
                           <p class="mt-1 text-xs text-slate-500">
                             Internal identifier:
@@ -313,14 +463,12 @@ export default function LemmaBrowser() {
                             <dt class="text-[11px] text-slate-500">Status</dt>
                             <dd class="text-xs text-slate-800">
                               {statusLabel(lemma().status)}
-                              {" "}
-                              (mock)
                             </dd>
                           </div>
                           <div class="flex flex-col gap-0.5">
                             <dt class="text-[11px] text-slate-500">Notes</dt>
                             <dd class="text-xs text-slate-800">
-                              {lemma().notes ?? "No notes yet (placeholder)."}
+                              {lemma().notes ?? "No notes yet."}
                             </dd>
                           </div>
                           <div class="flex flex-col gap-0.5">
@@ -370,7 +518,6 @@ export default function LemmaBrowser() {
                           >
                             <For each={sensesForSelected()}>
                               {(sense) => {
-                                const synset = synsetById(sense.synsetId);
                                 const isSenseSelected = () =>
                                   selectedSenseId() === sense.id;
                                 return (
@@ -381,9 +528,7 @@ export default function LemmaBrowser() {
                                           Sense
                                         </span>
                                         <span class="text-xs font-semibold text-slate-900">
-                                          {synset
-                                            ? `${synset.id} · "${synset.gloss}"`
-                                            : sense.synsetId}
+                                          {`${sense.synsetId} · "${sense.gloss}"`}
                                         </span>
                                         <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-600">
                                           Lemma → Sense → Synset
@@ -455,8 +600,9 @@ export default function LemmaBrowser() {
                           )}
                         >
                           {(sense) => {
-                            const lemmaForSense = getLemmaForSense(sense());
-                            const synsetForSense = getSynsetForSense(sense());
+                            const lemmaForSense = lemmas().find(
+                              lemma => lemma.id === sense().lemmaId,
+                            );
                             const relations = relationsForSelectedSense();
 
                             return (
@@ -472,9 +618,7 @@ export default function LemmaBrowser() {
                                           ? lemmaForSense.text
                                           : "Unknown lemma"}
                                         {" · "}
-                                        {synsetForSense
-                                          ? synsetForSense.gloss
-                                          : "Unknown synset"}
+                                        {sense().gloss}
                                       </span>
                                     </div>
                                     <p class="text-[11px] text-slate-600">

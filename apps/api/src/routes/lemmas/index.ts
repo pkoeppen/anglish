@@ -2,8 +2,9 @@ import type { FastifyPluginAsync } from "fastify";
 import { Language, WordnetPOS } from "@anglish/core";
 import { db } from "@anglish/db";
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 500;
+const DEFAULT_PAGE = 1;
+const DEFAULT_SIZE = 50;
+const MAX_SIZE = 500;
 
 const lemmaRoutes: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
   fastify.get<{
@@ -11,10 +12,11 @@ const lemmaRoutes: FastifyPluginAsync = async (fastify, _opts): Promise<void> =>
       q?: string;
       lang?: string;
       pos?: string;
-      limit?: string;
+      page?: string;
+      size?: string;
     };
   }>("/lemmas", async (request, reply) => {
-    const { q, lang, pos, limit } = request.query;
+    const { q, lang, pos, page, size } = request.query;
     const search = q?.trim();
 
     let resolvedLang: Language | undefined;
@@ -34,38 +36,87 @@ const lemmaRoutes: FastifyPluginAsync = async (fastify, _opts): Promise<void> =>
       resolvedPos = pos as WordnetPOS;
     }
 
-    const parsedLimit = limit ? Number.parseInt(limit, 10) : undefined;
-    const k = parsedLimit && Number.isFinite(parsedLimit)
-      ? Math.min(Math.max(1, parsedLimit), MAX_LIMIT)
-      : DEFAULT_LIMIT;
+    const parsedPage = page ? Number.parseInt(page, 10) : undefined;
+    const parsedSize = size ? Number.parseInt(size, 10) : undefined;
+    const resolvedPage = parsedPage && Number.isFinite(parsedPage)
+      ? Math.max(1, parsedPage)
+      : DEFAULT_PAGE;
+    const resolvedSize = parsedSize && Number.isFinite(parsedSize)
+      ? Math.min(Math.max(1, parsedSize), MAX_SIZE)
+      : DEFAULT_SIZE;
+    const offset = (resolvedPage - 1) * resolvedSize;
 
     try {
-      let query = db.kysely
-        .selectFrom("lemma")
-        .select([
-          "lemma.id",
-          "lemma.lemma",
-          "lemma.pos",
-          "lemma.lang",
-        ])
-        .orderBy("lemma.lemma", "asc")
-        .offset(60000)
-        .limit(k);
+      const whereParts: string[] = [];
+      const values: Array<string | number> = [];
+      let paramIndex = 1;
 
       if (search) {
-        query = query.where("lemma.lemma", "like", `%${search}%`);
+        whereParts.push(`lemma LIKE $${paramIndex++}`);
+        values.push(`%${search}%`);
       }
 
       if (resolvedLang) {
-        query = query.where("lemma.lang", "=", resolvedLang);
+        whereParts.push(`lang = $${paramIndex++}`);
+        values.push(resolvedLang);
       }
 
       if (resolvedPos) {
-        query = query.where("lemma.pos", "=", resolvedPos);
+        whereParts.push(`pos = $${paramIndex++}`);
+        values.push(resolvedPos);
       }
 
-      const rows = await query.execute();
-      return rows;
+      const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(" AND ")}` : "";
+      const countQuery = `
+        SELECT COUNT(*)::int AS total
+        FROM lemma
+        ${whereClause}
+      `;
+      const countResult = await db.pool.query<{ total: number }>(countQuery, values);
+      const total = countResult.rows[0]?.total ?? 0;
+      const totalPages = total > 0 ? Math.ceil(total / resolvedSize) : 0;
+
+      const queryValues = [...values, resolvedSize, offset];
+      const limitParam = values.length + 1;
+      const offsetParam = values.length + 2;
+      const rowsQuery = `
+        SELECT
+          lemma.id,
+          lemma.lemma,
+          lemma.pos,
+          lemma.lang,
+          lemma.status,
+          lemma.notes,
+          COALESCE(
+            JSONB_AGG(
+              JSONB_BUILD_OBJECT(
+                'id', sense.id,
+                'lemmaId', sense.lemma_id,
+                'synsetId', sense.synset_id,
+                'gloss', synset.gloss
+              )
+              ORDER BY sense.sense_index
+            ) FILTER (WHERE sense.id IS NOT NULL),
+            '[]'::jsonb
+          ) AS senses
+        FROM lemma
+        LEFT JOIN sense ON lemma.id = sense.lemma_id
+        LEFT JOIN synset ON sense.synset_id = synset.id
+        ${whereClause}
+        GROUP BY lemma.id, lemma.lemma, lemma.pos, lemma.lang, lemma.status, lemma.notes
+        ORDER BY lemma.lemma ASC
+        LIMIT $${limitParam}
+        OFFSET $${offsetParam}
+      `;
+
+      const result = await db.pool.query(rowsQuery, queryValues);
+      return {
+        data: result.rows,
+        page: resolvedPage,
+        size: resolvedSize,
+        total,
+        totalPages,
+      };
     }
     catch (err) {
       request.log.error(err);
