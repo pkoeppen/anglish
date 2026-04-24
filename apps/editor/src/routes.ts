@@ -13,6 +13,10 @@ export const routes: RouteDefinition[] = [
     component: lazy(() => import("./pages/lemmas")),
   },
   {
+    path: "/lemmas/:lemmaId",
+    component: lazy(() => import("./pages/lemmas")),
+  },
+  {
     path: "/synsets",
     component: lazy(() => import("./pages/synsets")),
   },

@@ -5,6 +5,7 @@ import { db } from "@anglish/db";
 const DEFAULT_PAGE = 1;
 const DEFAULT_SIZE = 50;
 const MAX_SIZE = 500;
+const LEMMA_STATUSES = ["draft", "published"] as const;
 
 const lemmaRoutes: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
   fastify.get<{
@@ -87,12 +88,16 @@ const lemmaRoutes: FastifyPluginAsync = async (fastify, _opts): Promise<void> =>
           lemma.lang,
           lemma.status,
           lemma.notes,
+          lemma.created_at,
+          lemma.updated_at,
           COALESCE(
             JSONB_AGG(
               JSONB_BUILD_OBJECT(
                 'id', sense.id,
                 'lemmaId', sense.lemma_id,
                 'synsetId', sense.synset_id,
+                'senseIndex', sense.sense_index,
+                'examples', to_jsonb(sense.examples),
                 'gloss', synset.gloss
               )
               ORDER BY sense.sense_index
@@ -121,6 +126,123 @@ const lemmaRoutes: FastifyPluginAsync = async (fastify, _opts): Promise<void> =>
     catch (err) {
       request.log.error(err);
       return reply.code(500).send({ error: "Failed to load lemmas" });
+    }
+  });
+
+  fastify.get<{
+    Params: {
+      id: string;
+    };
+  }>("/lemmas/:id", async (request, reply) => {
+    const lemmaId = Number.parseInt(request.params.id, 10);
+    if (!Number.isFinite(lemmaId))
+      return reply.code(400).send({ error: "Invalid lemma id" });
+
+    try {
+      const result = await db.pool.query(`
+        SELECT
+          lemma.id,
+          lemma.lemma,
+          lemma.pos,
+          lemma.lang,
+          lemma.status,
+          lemma.notes,
+          lemma.created_at,
+          lemma.updated_at,
+          COALESCE(
+            JSONB_AGG(
+              JSONB_BUILD_OBJECT(
+                'id', sense.id,
+                'lemmaId', sense.lemma_id,
+                'synsetId', sense.synset_id,
+                'senseIndex', sense.sense_index,
+                'examples', to_jsonb(sense.examples),
+                'gloss', synset.gloss
+              )
+              ORDER BY sense.sense_index
+            ) FILTER (WHERE sense.id IS NOT NULL),
+            '[]'::jsonb
+          ) AS senses
+        FROM lemma
+        LEFT JOIN sense ON lemma.id = sense.lemma_id
+        LEFT JOIN synset ON sense.synset_id = synset.id
+        WHERE lemma.id = $1
+        GROUP BY lemma.id, lemma.lemma, lemma.pos, lemma.lang, lemma.status, lemma.notes
+      `, [lemmaId]);
+
+      const row = result.rows[0];
+      if (!row)
+        return reply.code(404).send({ error: "Lemma not found" });
+      return row;
+    }
+    catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: "Failed to load lemma" });
+    }
+  });
+
+  fastify.put<{
+    Params: {
+      id: string;
+    };
+    Body: {
+      lemma?: string;
+      pos?: string;
+      lang?: string;
+      status?: string;
+      notes?: string | null;
+    };
+  }>("/lemmas/:id", async (request, reply) => {
+    const lemmaId = Number.parseInt(request.params.id, 10);
+    if (!Number.isFinite(lemmaId))
+      return reply.code(400).send({ error: "Invalid lemma id" });
+
+    const nextLemma = request.body.lemma?.trim();
+    const nextPos = request.body.pos;
+    const nextLang = request.body.lang;
+    const nextStatus = request.body.status;
+    const nextNotes = request.body.notes;
+
+    if (!nextLemma)
+      return reply.code(400).send({ error: "Lemma is required" });
+    if (!nextPos || !Object.values(WordnetPOS).includes(nextPos as WordnetPOS))
+      return reply.code(400).send({ error: "Invalid part of speech" });
+    if (!nextLang || !Object.values(Language).includes(nextLang as Language))
+      return reply.code(400).send({ error: "Invalid language" });
+    if (!nextStatus || !LEMMA_STATUSES.includes(nextStatus as (typeof LEMMA_STATUSES)[number]))
+      return reply.code(400).send({ error: "Invalid lemma status" });
+    if (nextNotes != null && typeof nextNotes !== "string")
+      return reply.code(400).send({ error: "Invalid notes" });
+
+    try {
+      const result = await db.pool.query(`
+        UPDATE lemma
+        SET
+          lemma = $2,
+          pos = $3,
+          lang = $4,
+          status = $5,
+          notes = $6
+        WHERE id = $1
+        RETURNING id, lemma, pos, lang, status, notes, created_at, updated_at
+      `, [
+        lemmaId,
+        nextLemma,
+        nextPos,
+        nextLang,
+        nextStatus,
+        nextNotes?.trim() ? nextNotes.trim() : null,
+      ]);
+
+      const row = result.rows[0];
+      if (!row)
+        return reply.code(404).send({ error: "Lemma not found" });
+
+      return row;
+    }
+    catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: "Failed to update lemma" });
     }
   });
 };

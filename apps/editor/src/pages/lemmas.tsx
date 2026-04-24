@@ -1,5 +1,8 @@
-import type { Lemma, Sense, Synset } from "./thesaurus-mock-data";
+import type { EditLemmaSavePayload } from "../components/modals/EditLemmaModal";
+import type { Lemma, Synset } from "./thesaurus-mock-data";
+import { useNavigate, useParams } from "@solidjs/router";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { ModalProvider, useModal } from "../components/modals";
 import ThesaurusNav from "../components/ThesaurusNav";
 import {
   getLemmaForSense,
@@ -15,6 +18,8 @@ interface ApiLemma {
   status: Lemma["status"];
   notes: string | null;
   senses: ApiSense[];
+  created_at: string;
+  updated_at: string;
 }
 
 interface ApiSense {
@@ -22,6 +27,8 @@ interface ApiSense {
   lemmaId: number;
   synsetId: string;
   gloss: string;
+  senseIndex?: number;
+  examples?: string[];
 }
 
 interface ApiLemmaResponse {
@@ -32,14 +39,19 @@ interface ApiLemmaResponse {
   totalPages: number;
 }
 
-function posShort(pos: Lemma["pos"]) {
+function posShort(pos: ApiLemma["pos"] | Lemma["pos"]) {
   switch (pos) {
+    case "n":
     case "noun":
       return "n.";
+    case "v":
     case "verb":
       return "v.";
+    case "a":
+    case "s":
     case "adjective":
       return "adj.";
+    case "r":
     case "adverb":
       return "adv.";
   }
@@ -47,41 +59,6 @@ function posShort(pos: Lemma["pos"]) {
 
 function statusLabel(status: Lemma["status"] | Synset["status"]) {
   return status === "published" ? "Published" : "Draft";
-}
-
-function wordnetPosToLemmaPos(pos: string): Lemma["pos"] {
-  switch (pos) {
-    case "n":
-      return "noun";
-    case "v":
-      return "verb";
-    case "a":
-    case "s":
-      return "adjective";
-    case "r":
-      return "adverb";
-    default:
-      return "noun";
-  }
-}
-
-function mapApiLemmaToLemma(row: ApiLemma): Lemma {
-  return {
-    id: String(row.id),
-    text: row.lemma,
-    pos: wordnetPosToLemmaPos(row.pos),
-    status: row.status,
-    notes: row.notes ?? undefined,
-  };
-}
-
-function mapApiSenseToSense(row: ApiSense): Sense {
-  return {
-    id: String(row.id),
-    lemmaId: String(row.lemmaId),
-    synsetId: row.synsetId,
-    gloss: row.gloss,
-  };
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -101,14 +78,14 @@ function LemmaStatusLabel(props: { status: Lemma["status"] }) {
   );
 }
 
-export default function LemmaBrowser() {
-  const [lemmas, setLemmas] = createSignal<Lemma[]>([]);
-  const [sensesByLemmaId, setSensesByLemmaId] = createSignal<Record<string, Sense[]>>({});
+function LemmaBrowserPage() {
+  const navigate = useNavigate();
+  const params = useParams<{ lemmaId?: string }>();
+  const { openModal: openEditLemmaModal } = useModal("editLemmaModal");
+  const { openModal: openEditSenseModal } = useModal("editSenseModal");
+  const [lemmas, setLemmas] = createSignal<ApiLemma[]>([]);
   const [searchQuery, setSearchQuery] = createSignal("");
-  const [selectedId, setSelectedId] = createSignal<string | null>(null);
-  const [selectedSenseId, setSelectedSenseId] = createSignal<string | null>(
-    null,
-  );
+  const [selectedLemma, setSelectedLemma] = createSignal<ApiLemma | null>(null);
   const [isLoading, setIsLoading] = createSignal(false);
   const [loadError, setLoadError] = createSignal<string | null>(null);
   const [page, setPage] = createSignal(1);
@@ -116,6 +93,47 @@ export default function LemmaBrowser() {
   const [total, setTotal] = createSignal(0);
   const [totalPages, setTotalPages] = createSignal(0);
   let latestRequestId = 0;
+  let latestLemmaByIdRequestId = 0;
+
+  const refetchLemmaById = async (lemmaId: number) => {
+    try {
+      const res = await fetch(`/api/lemmas/${lemmaId}`);
+      if (!res.ok)
+        return;
+      const fullLemma = (await res.json()) as ApiLemma;
+      setSelectedLemma(prev => (prev?.id === lemmaId ? fullLemma : prev));
+      setLemmas(prev =>
+        prev.map(lemma => (lemma.id === lemmaId ? fullLemma : lemma)),
+      );
+    }
+    catch (err) {
+      console.error("Error refetching lemma after sense save", err);
+    }
+  };
+
+  const handleLemmaSaveSuccess = (payload: EditLemmaSavePayload) => {
+    const status = payload.status as ApiLemma["status"];
+    setSelectedLemma(prev =>
+      prev
+        ? {
+            ...prev,
+            ...payload,
+            status,
+          }
+        : prev,
+    );
+    setLemmas(prev =>
+      prev.map(lemma =>
+        lemma.id === payload.id
+          ? {
+              ...lemma,
+              ...payload,
+              status,
+            }
+          : lemma,
+      ),
+    );
+  };
 
   const fetchLemmas = async (query: string, nextPage: number) => {
     const requestId = ++latestRequestId;
@@ -135,39 +153,21 @@ export default function LemmaBrowser() {
         throw new Error(`Failed to load lemmas (${res.status})`);
 
       const payload = (await res.json()) as ApiLemmaResponse;
-      const mapped = payload.data.map(mapApiLemmaToLemma);
-      const nextSensesByLemmaId = Object.fromEntries(
-        payload.data.map(row => [
-          String(row.id),
-          (row.senses ?? []).map(mapApiSenseToSense),
-        ]),
-      );
       if (requestId !== latestRequestId)
         return;
 
-      setLemmas(mapped);
-      setSensesByLemmaId(nextSensesByLemmaId);
+      setLemmas(payload.data);
       setPage(payload.page);
       setTotal(payload.total);
       setTotalPages(payload.totalPages);
-      const currentSelectedId = selectedId();
-      const nextSelectedId = mapped.some(l => l.id === currentSelectedId)
-        ? currentSelectedId
-        : (mapped[0]?.id ?? null);
-      setSelectedId(nextSelectedId);
-      if (!nextSelectedId)
-        setSelectedSenseId(null);
     }
     catch (err) {
       if (requestId !== latestRequestId)
         return;
       console.error("Error fetching lemmas", err);
       setLemmas([]);
-      setSensesByLemmaId({});
       setTotal(0);
       setTotalPages(0);
-      setSelectedId(null);
-      setSelectedSenseId(null);
       setLoadError("Could not load lemmas. Please try again.");
     }
     finally {
@@ -176,32 +176,20 @@ export default function LemmaBrowser() {
     }
   };
 
-  const selectedLemma = createMemo<Lemma | undefined>(() => {
-    const currentId = selectedId();
-    if (!currentId)
-      return undefined;
-    return lemmas().find(l => l.id === currentId);
-  });
-
-  const sensesForSelected = createMemo<Sense[]>(() => {
-    const id = selectedLemma()?.id;
-    if (!id)
+  const sensesForSelected = createMemo<ApiSense[]>(() => {
+    const lemma = selectedLemma();
+    if (!lemma)
       return [];
-    return sensesByLemmaId()[id] ?? [];
+    return lemma.senses;
   });
 
-  const selectedSense = createMemo<Sense | undefined>(() => {
-    const id = selectedSenseId();
-    if (!id)
-      return undefined;
-    return sensesForSelected().find(sense => sense.id === id);
-  });
-
-  const relationsForSelectedSense = createMemo(() => {
-    const id = selectedSenseId();
-    if (!id)
-      return [];
-    return getRelationsForSense(id);
+  const hasSearchInput = createMemo(() => searchQuery().trim().length > 0);
+  const routeLemmaId = createMemo<number | null>(() => {
+    const raw = params.lemmaId;
+    if (!raw)
+      return null;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) ? parsed : null;
   });
 
   createEffect(() => {
@@ -212,6 +200,16 @@ export default function LemmaBrowser() {
   createEffect(() => {
     const query = searchQuery();
     const currentPage = page();
+    if (!query.trim()) {
+      latestRequestId += 1;
+      setIsLoading(false);
+      setLoadError(null);
+      setLemmas([]);
+      setTotal(0);
+      setTotalPages(0);
+      return;
+    }
+
     const timer = setTimeout(() => {
       void fetchLemmas(query, currentPage);
     }, SEARCH_DEBOUNCE_MS);
@@ -219,16 +217,33 @@ export default function LemmaBrowser() {
   });
 
   createEffect(() => {
-    const currentSenseId = selectedSenseId();
-    const currentLemmaId = selectedLemma()?.id;
-    if (!currentSenseId || !currentLemmaId)
+    const lemmaId = routeLemmaId();
+    if (!lemmaId)
       return;
 
-    const stillBelongsToSelectedLemma = (sensesByLemmaId()[currentLemmaId] ?? []).some(
-      sense => sense.id === currentSenseId,
-    );
-    if (!stillBelongsToSelectedLemma)
-      setSelectedSenseId(null);
+    const lemmaInResults = lemmas().find(lemma => lemma.id === lemmaId);
+    if (lemmaInResults) {
+      setSelectedLemma(lemmaInResults);
+      return;
+    }
+
+    const requestId = ++latestLemmaByIdRequestId;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/lemmas/${lemmaId}`);
+        if (!res.ok)
+          throw new Error(`Failed to load lemma (${res.status})`);
+        const payload = (await res.json()) as ApiLemma;
+        if (requestId !== latestLemmaByIdRequestId)
+          return;
+        setSelectedLemma(payload);
+      }
+      catch (err) {
+        if (requestId !== latestLemmaByIdRequestId)
+          return;
+        console.error("Error fetching lemma by id", err);
+      }
+    })();
   });
 
   return (
@@ -324,72 +339,84 @@ export default function LemmaBrowser() {
 
               <div class="flex-1 overflow-auto px-1 py-2">
                 <Show
-                  when={loadError()}
+                  when={hasSearchInput()}
                   fallback={(
-                    <Show
-                      when={!isLoading()}
-                      fallback={(
-                        <div class="px-3 py-2 text-xs text-slate-500">
-                          Loading lemmas...
-                        </div>
-                      )}
-                    >
+                    <div class="flex h-full items-center justify-center px-3 py-2 text-center text-xs text-slate-500">
+                      Type something to search.
+                    </div>
+                  )}
+                >
+                  <Show
+                    when={loadError()}
+                    fallback={(
                       <Show
-                        when={lemmas().length > 0}
+                        when={!isLoading()}
                         fallback={(
                           <div class="px-3 py-2 text-xs text-slate-500">
-                            No lemmas found.
+                            Loading lemmas...
                           </div>
                         )}
                       >
-                        <div class="flex flex-col gap-1 text-xs">
-                          <For each={lemmas()}>
-                            {(lemma) => {
-                              const realSenseCount = (sensesByLemmaId()[lemma.id] ?? []).length;
-                              const isSelected = () => selectedId() === lemma.id;
-                              return (
-                                <button
-                                  type="button"
-                                  class={`rounded-md border px-3 py-2 text-left cursor-pointer ${
-                                    isSelected()
-                                      ? "border-sky-200 bg-sky-50 text-slate-900"
-                                      : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50"
-                                  }`}
-                                  onClick={() => setSelectedId(lemma.id)}
-                                >
-                                  <div class="flex items-center justify-between gap-2">
-                                    <div class="font-medium">{lemma.text}</div>
-                                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">
-                                      {posShort(lemma.pos)}
-                                    </span>
-                                  </div>
-                                  <div class="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                                    <span
-                                      class={`text-[10px] uppercase tracking-wide ${
-                                        lemma.status === "published"
-                                          ? "text-emerald-500"
-                                          : "text-amber-700"
-                                      }`}
-                                    >
-                                      {statusLabel(lemma.status)}
-                                    </span>
-                                    <span>
-                                      {realSenseCount}
-                                      {" "}
-                                      sense
-                                      {realSenseCount === 1 ? "" : "s"}
-                                    </span>
-                                  </div>
-                                </button>
-                              );
-                            }}
-                          </For>
-                        </div>
+                        <Show
+                          when={lemmas().length > 0}
+                          fallback={(
+                            <div class="px-3 py-2 text-xs text-slate-500">
+                              No lemmas found.
+                            </div>
+                          )}
+                        >
+                          <div class="flex flex-col gap-1 text-xs">
+                            <For each={lemmas()}>
+                              {(lemma) => {
+                                const realSenseCount = lemma.senses.length;
+                                const isSelected = () => selectedLemma()?.id === lemma.id;
+                                return (
+                                  <button
+                                    type="button"
+                                    class={`rounded-md border px-3 py-2 text-left cursor-pointer ${
+                                      isSelected()
+                                        ? "border-sky-200 bg-sky-50 text-slate-900"
+                                        : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50"
+                                    }`}
+                                    onClick={() => {
+                                      setSelectedLemma(lemma);
+                                      navigate(`/lemmas/${lemma.id}`);
+                                    }}
+                                  >
+                                    <div class="flex items-center justify-between gap-2">
+                                      <div class="font-medium">{lemma.lemma}</div>
+                                      <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">
+                                        {posShort(lemma.pos)}
+                                      </span>
+                                    </div>
+                                    <div class="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                                      <span
+                                        class={`text-[10px] uppercase tracking-wide ${
+                                          lemma.status === "published"
+                                            ? "text-emerald-500"
+                                            : "text-amber-700"
+                                        }`}
+                                      >
+                                        {statusLabel(lemma.status)}
+                                      </span>
+                                      <span>
+                                        {realSenseCount}
+                                        {" "}
+                                        sense
+                                        {realSenseCount === 1 ? "" : "s"}
+                                      </span>
+                                    </div>
+                                  </button>
+                                );
+                              }}
+                            </For>
+                          </div>
+                        </Show>
                       </Show>
-                    </Show>
-                  )}
-                >
-                  <div class="px-3 py-2 text-xs text-red-600">{loadError()}</div>
+                    )}
+                  >
+                    <div class="px-3 py-2 text-xs text-red-600">{loadError()}</div>
+                  </Show>
                 </Show>
               </div>
             </div>
@@ -412,7 +439,7 @@ export default function LemmaBrowser() {
                         <div>
                           <div class="flex items-center gap-2">
                             <h3 class="text-lg font-semibold text-slate-900">
-                              {lemma().text}
+                              {lemma().lemma}
                             </h3>
                             <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-600">
                               {posShort(lemma().pos)}
@@ -430,7 +457,16 @@ export default function LemmaBrowser() {
                           <button
                             type="button"
                             class="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
-                            onClick={() => console.warn("TODO: edit lemma")}
+                            onClick={() =>
+                              openEditLemmaModal({
+                                lemmaId: lemma().id,
+                                lemma: lemma().lemma,
+                                pos: lemma().pos,
+                                lang: lemma().lang,
+                                notes: lemma().notes ?? "",
+                                status: lemma().status,
+                                onSuccess: handleLemmaSaveSuccess,
+                              })}
                           >
                             Edit lemma
                           </button>
@@ -476,7 +512,13 @@ export default function LemmaBrowser() {
                               Timestamps
                             </dt>
                             <dd class="text-xs text-slate-800">
-                              Created · mock · Last updated · mock
+                              Created ·
+                              {" "}
+                              {lemma().created_at}
+                              {" "}
+                              · Last updated ·
+                              {" "}
+                              {lemma().updated_at}
                             </dd>
                           </div>
                         </dl>
@@ -517,9 +559,11 @@ export default function LemmaBrowser() {
                             )}
                           >
                             <For each={sensesForSelected()}>
-                              {(sense) => {
-                                const isSenseSelected = () =>
-                                  selectedSenseId() === sense.id;
+                              {(sense, index) => {
+                                const relations = () =>
+                                  getRelationsForSense(String(sense.id));
+                                const lemmaForSense = () =>
+                                  lemmas().find(lemma => lemma.id === sense.lemmaId);
                                 return (
                                   <article class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
                                     <header class="flex items-center justify-between gap-3">
@@ -534,230 +578,141 @@ export default function LemmaBrowser() {
                                           Lemma → Sense → Synset
                                         </span>
                                       </div>
-                                      <button
-                                        type="button"
-                                        class="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-600 hover:bg-slate-50"
-                                        onClick={() => setSelectedSenseId(
-                                          isSenseSelected() ? null : sense.id,
-                                        )}
-                                      >
-                                        {isSenseSelected()
-                                          ? "Hide detail"
-                                          : "View detail"}
-                                      </button>
+                                      <div class="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          class="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
+                                          onClick={() =>
+                                            openEditSenseModal({
+                                              senseId: sense.id,
+                                              synsetId: sense.synsetId,
+                                              senseIndex: sense.senseIndex ?? index(),
+                                              examples: sense.examples ?? [],
+                                              onSuccess: payload => {
+                                                void refetchLemmaById(payload.lemmaId);
+                                              },
+                                            })}
+                                        >
+                                          Edit Sense
+                                        </button>
+                                        <button
+                                          type="button"
+                                          class="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
+                                          onClick={() =>
+                                            console.warn(
+                                              "TODO: open Add relation flow",
+                                            )}
+                                        >
+                                          Add Relation
+                                        </button>
+                                      </div>
                                     </header>
                                     <p class="mt-1 text-[11px] text-slate-700">
                                       {sense.gloss}
+                                    </p>
+                                    <p class="mt-1 text-[11px] text-slate-600">
+                                      Sense id:
+                                      {" "}
+                                      {sense.id}
+                                      {" · "}
+                                      {lemmaForSense()
+                                        ? lemmaForSense()?.lemma
+                                        : "Unknown lemma"}
                                     </p>
                                     <dl class="mt-2 grid grid-cols-3 gap-2 text-[11px] text-slate-600">
                                       <div>
                                         <dt class="text-[10px] uppercase tracking-wide text-slate-500">
                                           Register
                                         </dt>
-                                        <dd>{sense.register ?? "—"}</dd>
+                                        <dd>—</dd>
                                       </div>
                                       <div>
                                         <dt class="text-[10px] uppercase tracking-wide text-slate-500">
                                           Usage
                                         </dt>
-                                        <dd>{sense.usage ?? "—"}</dd>
+                                        <dd>—</dd>
                                       </div>
                                       <div>
                                         <dt class="text-[10px] uppercase tracking-wide text-slate-500">
                                           Source
                                         </dt>
-                                        <dd>{sense.source ?? "—"}</dd>
+                                        <dd>—</dd>
                                       </div>
                                     </dl>
+                                    <div class="mt-3">
+                                      <div class="mb-1">
+                                        <h5 class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                          Relations
+                                        </h5>
+                                        <p class="mt-0.5 text-[11px] text-slate-500">
+                                          These correspond to sense-to-sense links
+                                          such as
+                                          {" "}
+                                          <span class="font-medium">antonym</span>
+                                          {" "}
+                                          or
+                                          {" "}
+                                          <span class="font-medium">see-also</span>
+                                          .
+                                        </p>
+                                      </div>
+                                      <Show
+                                        when={relations().length > 0}
+                                        fallback={(
+                                          <p class="mt-1 text-[11px] text-slate-500">
+                                            This sense has no relations yet. Future
+                                            tools will let you add antonyms and
+                                            other links.
+                                          </p>
+                                        )}
+                                      >
+                                        <div class="mt-2 space-y-2">
+                                          <For each={relations()}>
+                                            {(rel) => {
+                                              const targetSense = rel.isOutgoing
+                                                ? rel.toSense
+                                                : rel.fromSense;
+                                              const targetLemma = getLemmaForSense(
+                                                targetSense,
+                                              );
+                                              const targetSynset = getSynsetForSense(
+                                                targetSense,
+                                              );
+                                              return (
+                                                <div class="rounded-md border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-700">
+                                                  <div class="flex flex-wrap items-center justify-between gap-2">
+                                                    <div class="flex flex-wrap items-center gap-2">
+                                                      <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-50">
+                                                        {rel.relation}
+                                                      </span>
+                                                      <span class="text-[11px] font-medium text-slate-900">
+                                                        {targetLemma
+                                                          ? targetLemma.text
+                                                          : "Unknown lemma"}
+                                                        {targetSynset
+                                                          ? ` · "${targetSynset.gloss}"`
+                                                          : ""}
+                                                      </span>
+                                                    </div>
+                                                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-600">
+                                                      {rel.isOutgoing
+                                                        ? "This sense → Target sense"
+                                                        : "Target sense → This sense"}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              );
+                                            }}
+                                          </For>
+                                        </div>
+                                      </Show>
+                                    </div>
                                   </article>
                                 );
                               }}
                             </For>
                           </Show>
                         </div>
-                      </section>
-
-                      <section>
-                        <h4 class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                          Sense detail & relations
-                        </h4>
-                        <p class="mt-1 text-[11px] text-slate-500">
-                          This panel describes a
-                          {" "}
-                          <span class="font-medium">sense</span>
-                          : one specific
-                          way this lemma links to a synset. Relations connect
-                          this sense to other senses (for example, antonyms).
-                        </p>
-
-                        <Show
-                          when={selectedSense()}
-                          fallback={(
-                            <p class="mt-2 text-[11px] text-slate-500">
-                              Choose “View detail” on a sense above to inspect
-                              its fields and relations.
-                            </p>
-                          )}
-                        >
-                          {(sense) => {
-                            const lemmaForSense = lemmas().find(
-                              lemma => lemma.id === sense().lemmaId,
-                            );
-                            const relations = relationsForSelectedSense();
-
-                            return (
-                              <div class="mt-3 space-y-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
-                                <div class="flex flex-wrap items-center justify-between gap-3">
-                                  <div class="space-y-0.5">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                      <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-50">
-                                        Sense
-                                      </span>
-                                      <span class="text-xs font-semibold text-slate-900">
-                                        {lemmaForSense
-                                          ? lemmaForSense.text
-                                          : "Unknown lemma"}
-                                        {" · "}
-                                        {sense().gloss}
-                                      </span>
-                                    </div>
-                                    <p class="text-[11px] text-slate-600">
-                                      Sense id:
-                                      {" "}
-                                      {sense().id}
-                                    </p>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    class="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
-                                    onClick={() =>
-                                      console.warn(
-                                        "TODO: edit sense fields in backend",
-                                      )}
-                                  >
-                                    Edit sense (stub)
-                                  </button>
-                                </div>
-
-                                <div class="space-y-1">
-                                  <dt class="text-[11px] font-medium text-slate-600">
-                                    Gloss
-                                  </dt>
-                                  <dd class="text-[11px] text-slate-800">
-                                    {sense().gloss}
-                                  </dd>
-                                </div>
-
-                                <dl class="grid grid-cols-3 gap-2 text-[11px] text-slate-600">
-                                  <div>
-                                    <dt class="text-[10px] uppercase tracking-wide text-slate-500">
-                                      Register
-                                    </dt>
-                                    <dd>{sense().register ?? "—"}</dd>
-                                  </div>
-                                  <div>
-                                    <dt class="text-[10px] uppercase tracking-wide text-slate-500">
-                                      Usage
-                                    </dt>
-                                    <dd>{sense().usage ?? "—"}</dd>
-                                  </div>
-                                  <div>
-                                    <dt class="text-[10px] uppercase tracking-wide text-slate-500">
-                                      Source
-                                    </dt>
-                                    <dd>{sense().source ?? "—"}</dd>
-                                  </div>
-                                </dl>
-
-                                <div>
-                                  <div class="mb-1 flex items-center justify-between gap-2">
-                                    <div>
-                                      <h5 class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                        Relations
-                                      </h5>
-                                      <p class="mt-0.5 text-[11px] text-slate-500">
-                                        These correspond to sense-to-sense links
-                                        such as
-                                        {" "}
-                                        <span class="font-medium">
-                                          antonym
-                                        </span>
-                                        {" "}
-                                        or
-                                        {" "}
-                                        <span class="font-medium">
-                                          see-also
-                                        </span>
-                                        .
-                                      </p>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      class="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
-                                      onClick={() =>
-                                        console.warn(
-                                          "TODO: open Add relation flow",
-                                        )}
-                                    >
-                                      Add relation
-                                    </button>
-                                  </div>
-
-                                  <Show
-                                    when={relations.length > 0}
-                                    fallback={(
-                                      <p class="mt-1 text-[11px] text-slate-500">
-                                        This sense has no relations yet. Future
-                                        tools will let you add antonyms and
-                                        other links.
-                                      </p>
-                                    )}
-                                  >
-                                    <div class="mt-2 space-y-2">
-                                      <For each={relations}>
-                                        {(rel) => {
-                                          const targetSense = rel.isOutgoing
-                                            ? rel.toSense
-                                            : rel.fromSense;
-                                          const targetLemma = getLemmaForSense(
-                                            targetSense,
-                                          );
-                                          const targetSynset = getSynsetForSense(
-                                            targetSense,
-                                          );
-                                          return (
-                                            <div class="rounded-md border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-700">
-                                              <div class="flex flex-wrap items-center justify-between gap-2">
-                                                <div class="flex flex-wrap items-center gap-2">
-                                                  <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-50">
-                                                    {rel.relation}
-                                                  </span>
-                                                  <span class="text-[11px] font-medium text-slate-900">
-                                                    {targetLemma
-                                                      ? targetLemma.text
-                                                      : "Unknown lemma"}
-                                                    {targetSynset
-                                                      ? ` · "${targetSynset.gloss}"`
-                                                      : ""}
-                                                  </span>
-                                                </div>
-                                                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-600">
-                                                  {rel.isOutgoing
-                                                    ? "This sense → Target sense"
-                                                    : "Target sense → This sense"}
-                                                </span>
-                                              </div>
-                                            </div>
-                                          );
-                                        }}
-                                      </For>
-                                    </div>
-                                  </Show>
-                                </div>
-                              </div>
-                            );
-                          }}
-                        </Show>
                       </section>
                     </div>
                   </>
@@ -768,5 +723,13 @@ export default function LemmaBrowser() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function LemmaBrowser() {
+  return (
+    <ModalProvider>
+      <LemmaBrowserPage />
+    </ModalProvider>
   );
 }
